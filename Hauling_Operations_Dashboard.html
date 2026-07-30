@@ -2981,6 +2981,17 @@ function confirmUploadImport(){
       const canonical = CANONICAL_FIELDS.find(f=>f.label===canonicalLabel);
       const row = findRow(siteKey, [canonical.re], canonical.block);
       if(!row) return;
+      // This sheet is authoritative for every date its header spans (the
+      // whole reporting month) — clear any pre-existing value here that
+      // the new file doesn't actually supply a real number for, so stale
+      // leftover/placeholder data from before this area had real Excel
+      // data can't keep dragging down month-to-date averages forever.
+      areaData.dateCols.forEach(iso=>{
+        const v = fieldInfo.perDate[iso];
+        if(!row.entries[iso]) return;
+        if(!v || v.day===null) row.entries[iso].day = null;
+        if(!v || v.night===null) row.entries[iso].night = null;
+      });
       Object.keys(fieldInfo.perDate).forEach(iso=>{
         const v = fieldInfo.perDate[iso];
         if(!row.entries[iso]) row.entries[iso] = { day:null, night:null };
