@@ -1458,21 +1458,23 @@ function parseFuelWorkbook(workbook){
     const ws = workbook.Sheets[fuelName];
     const maxRow = sheetMaxRow(ws);
     const dayMap = {};
-    // Daily summary table: columns P-S = Date, QtyFuel, QtyTonnage, FRPlan.
+    // Daily summary table: columns Q-T = Date, QtyFuel, QtyTonnage, FRPlan.
     for(let r=1; r<=maxRow; r++){
-      const d = excelDateToISO(cellVal(ws,"P"+r));
-      const qtyFuel = num(cellVal(ws,"Q"+r)), qtyTonnage = num(cellVal(ws,"R"+r));
+      const d = excelDateToISO(cellVal(ws,"Q"+r));
+      const qtyFuel = num(cellVal(ws,"R"+r)), qtyTonnage = num(cellVal(ws,"S"+r));
       if(d && (qtyFuel!==null || qtyTonnage!==null)){
-        dayMap[d] = { date:d, qtyFuel, qtyTonnage, frPlan:num(cellVal(ws,"S"+r)), tonKm:0 };
+        dayMap[d] = { date:d, qtyFuel, qtyTonnage, frPlan:num(cellVal(ws,"T"+r)), tonKm:null };
       }
     }
-    // Per-shift table: columns B=Date, J=DistanceKm, L=Tonnage -> sum(distance*tonnage) per day = ton-km
+    // Per-shift table: columns B=Date, K=DistanceKm (already in km — G:J are a
+    // per-area distance breakdown in meters, not the figure we want here),
+    // M=Tonnage (L is Cycles, not tonnage) -> sum(distance*tonnage) per day = ton-km
     for(let r=1; r<=maxRow; r++){
       const d = excelDateToISO(cellVal(ws,"B"+r));
-      const distKm = num(cellVal(ws,"J"+r)), tonnage = num(cellVal(ws,"L"+r));
+      const distKm = num(cellVal(ws,"K"+r)), tonnage = num(cellVal(ws,"M"+r));
       if(d && distKm!==null && tonnage!==null){
-        if(!dayMap[d]) dayMap[d] = { date:d, qtyFuel:null, qtyTonnage:null, frPlan:null, tonKm:0 };
-        dayMap[d].tonKm = Math.round((dayMap[d].tonKm + distKm*tonnage)*10)/10;
+        if(!dayMap[d]) dayMap[d] = { date:d, qtyFuel:null, qtyTonnage:null, frPlan:null, tonKm:null };
+        dayMap[d].tonKm = Math.round(((dayMap[d].tonKm||0) + distKm*tonnage)*10)/10;
       }
     }
     days = Object.values(dayMap).sort((a,b)=> a.date<b.date?-1:1);
