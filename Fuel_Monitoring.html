@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<script>
+window.onerror = function(msg, url, line, col, error){
+  function show(){
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;padding:16px 20px;font-family:monospace;font-size:13px;z-index:999999;white-space:pre-wrap;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    d.textContent = '⚠ JS ERROR CAUGHT:\n' + msg + '\nLine ' + line + ':' + col + '\nFile: ' + (url||'inline') + (error&&error.stack?('\n\nStack:\n'+error.stack):'');
+    (document.body||document.documentElement).insertBefore(d, (document.body||document.documentElement).firstChild);
+  }
+  if(document.body){ show(); } else { document.addEventListener('DOMContentLoaded', show); }
+  return false;
+};
+</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Monitoring — PT. Teknologi Infrastruktur Indonesia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  function loadScriptChain(urls, onDone){
+    let i = 0;
+    function tryNext(){
+      if(i >= urls.length){ onDone(false); return; }
+      const s = document.createElement('script');
+      s.src = urls[i++];
+      s.onload = ()=>onDone(true);
+      s.onerror = tryNext;
+      document.head.appendChild(s);
+    }
+    tryNext();
+  }
+  window.__chartReady = new Promise(res=>{
+    loadScriptChain([
+      "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js",
+      "https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js",
+      "https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js"
+    ], res);
+  });
+  window.__h2cReady = new Promise(res=>{
+    loadScriptChain([
+      "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+      "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+      "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"
+    ], res);
+  });
+  window.__xlsxReady = new Promise(res=>{
+    loadScriptChain([
+      "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
+      "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+      "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"
+    ], res);
+  });
+</script>
+<style>
+/* ============================================================
+   HAULING OPERATIONS — EXECUTIVE DAILY DASHBOARD
+   Design language: bright executive reporting suite, colors
+   drawn from the company mark (forest green + gold).
+   ============================================================ */
+
+@font-face { font-display: swap; }
+
+:root{
+  --bg:            #f4f6fa;
+  --bg-1:          #ffffff;
+  --bg-2:          #eaeef5;
+  --bg-3:          #dde4ee;
+  --border:        #ccd6e4;
+  --border-soft:   #e2e8f1;
+  --text:          #13213b;
+  --text-dim:      #4c5b76;
+  --text-faint:    #8996ac;
+
+  --amber:         #e8a90d;
+  --amber-dim:     #faedbb;
+  --teal:          #1d5fbf;
+  --teal-dim:      #d3e2f7;
+  --red:           #c9463a;
+  --red-dim:       #f4d6d1;
+  --green:         #2f8f58;
+
+  --brand-dark:    #0e1f3d;
+  --brand-dark-2:  #1b3a68;
+
+  --font-display:  'Barlow Condensed', sans-serif;
+  --font-body:     'Inter', sans-serif;
+  --font-mono:     'IBM Plex Mono', monospace;
+
+  --radius:  4px;
+  --radius-lg: 8px;
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; max-width:100%; overflow-x:clip; }
+body{
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse at top left, rgba(29,95,191,0.05), transparent 45%),
+    radial-gradient(ellipse at bottom right, rgba(232,169,13,0.07), transparent 45%);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height:1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar{ height:9px; width:9px; }
+::-webkit-scrollbar-track{ background:var(--bg-2); }
+::-webkit-scrollbar-thumb{ background:var(--border); border-radius:6px; }
+::-webkit-scrollbar-thumb:hover{ background:var(--text-faint); }
+
+button{ font-family:inherit; cursor:pointer; }
+select, input{ font-family:inherit; }
+
+a{ color:var(--amber); }
+
+/* ---------------- Layout shell ---------------- */
+#app{ max-width:1440px; margin:0 auto; padding:0 22px 60px; }
+
+/* ---------------- Top bar ---------------- */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:20px 24px; gap:24px;
+  margin:0 -22px; width:calc(100% + 44px);
+  background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-dark-2) 100%);
+  border-radius: 0 0 14px 14px;
+}
+.brand{ display:flex; align-items:center; gap:14px; }
+.brand-mark{
+  height:52px; width:auto; flex:none;
+  border-radius: var(--radius);
+  background: #f8f7f2;
+  border:1px solid rgba(255,255,255,0.15);
+  display:flex; align-items:center; justify-content:center;
+  padding:4px 8px;
+  overflow:hidden;
+  box-shadow:0 4px 14px rgba(0,0,0,0.25);
+}
+.brand-mark svg{ width:26px; height:26px; }
+.brand-logo-img{ height:100%; width:auto; object-fit:contain; display:block; }
+.brand-text h1{
+  font-family:var(--font-display);
+  font-weight:700;
+  font-size:26px;
+  letter-spacing:0.06em;
+  margin:0;
+  color:#fff;
+  text-transform:uppercase;
+}
+.brand-text p{
+  margin:2px 0 0;
+  font-size:12.5px;
+  color:#c7d8c9;
+  letter-spacing:0.02em;
+}
+.topbar-meta{ text-align:right; flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.lang-toggle{ display:flex; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.22); border-radius:var(--radius); overflow:hidden; }
+.lang-toggle button{
+  border:none; background:transparent; color:#d3e2d5;
+  padding:4px 10px; font-size:11px; font-weight:700; letter-spacing:0.04em; font-family:var(--font-body);
+}
+.lang-toggle button.active{ background:var(--amber); color:#0e1f3d; }
+#liveClock{
+  font-family:var(--font-mono);
+  font-size:20px;
+  color:#f0c419;
+  letter-spacing:0.03em;
+}
+.last-update{ font-size:11.5px; color:#a9bfab; margin-top:2px; }
+.last-update span{ color:#e3ede4; font-family:var(--font-mono); }
+.topbar .lock-toggle{ background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.25); color:#fff; }
+.topbar .lock-toggle:hover{ border-color:var(--amber); color:var(--amber); }
+.topbar .sync-badge{ background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.25); color:#e3ede4; }
+
+/* soft divider under the header band */
+.hazard-strip{
+  height:4px; width:100%; margin-bottom:20px; border-radius:3px;
+  background: linear-gradient(90deg, var(--teal) 0%, var(--amber) 100%);
+  opacity:0.85;
+}
+
+/* ---------------- Site tabs ---------------- */
+.site-tabs{
+  display:flex; gap:6px; overflow-x:auto; padding-bottom:10px; margin-bottom:14px;
+  border-bottom:1px solid var(--border-soft);
+}
+.site-tab{
+  background:transparent; border:1px solid transparent; border-bottom:none;
+  color:var(--text-dim); padding:9px 16px 11px; font-size:13px; font-weight:600;
+  border-radius: var(--radius) var(--radius) 0 0; white-space:nowrap;
+  position:relative; top:1px;
+  font-family: var(--font-display); letter-spacing:0.03em; font-size:15px;
+}
+.site-tab .dot{
+  display:inline-block; width:6px; height:6px; border-radius:50%;
+  margin-right:7px; background:var(--text-faint);
+}
+.site-tab.has-data .dot{ background:var(--green); }
+.site-tab:hover{ color:var(--text); }
+.site-tab.active{
+  color:var(--amber); background:var(--bg-1);
+  border-color:var(--border-soft);
+  border-bottom:1px solid var(--bg-1);
+}
+.site-tab.combined-tab{ font-weight:700; }
+.site-tab.combined-tab.active{ color:var(--amber); }
+.site-tab.add-tab{
+  color:var(--text-faint); border:1px dashed var(--border); border-bottom:1px dashed var(--border);
+  font-family:var(--font-body); font-size:12.5px; font-weight:600;
+}
+.site-tab.add-tab:hover{ color:var(--teal); border-color:var(--teal-dim); }
+
+/* ---------------- Controls bar ---------------- */
+.controls-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:12px;
+  padding:14px 16px; margin-bottom:20px;
+  background:var(--bg-1); border:1px solid var(--border-soft); border-radius:var(--radius-lg);
+}
+.mode-toggle{ display:flex; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.mode-toggle button{
+  border:none; background:transparent; color:var(--text-dim);
+  padding:8px 18px; font-size:13px; font-weight:600; font-family:var(--font-display); letter-spacing:0.04em; font-size:15px;
+}
+.mode-toggle button.active{ background:var(--amber); color:#0e1f3d; }
+
+.date-picker{ display:flex; align-items:center; gap:8px; }
+.date-picker label{ font-size:11.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.06em; }
+.date-picker select{
+  background:var(--bg); color:var(--text); border:1px solid var(--border);
+  border-radius:var(--radius); padding:7px 10px; font-size:13px; min-width:150px;
+}
+.date-picker button{
+  width:30px; height:30px; border-radius:var(--radius); border:1px solid var(--border);
+  background:var(--bg); color:var(--text-dim); font-size:15px;
+}
+.date-picker button:hover{ color:var(--amber); border-color:var(--amber-dim); }
+
+.actions{ display:flex; align-items:center; gap:10px; position:relative; flex-wrap:wrap; }
+.btn{
+  border:1px solid var(--border); background:var(--bg-2); color:var(--text);
+  padding:8px 14px; border-radius:var(--radius); font-size:12.5px; font-weight:600;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.btn:hover{ border-color:var(--amber-dim); color:var(--amber); }
+.btn.primary{ background:var(--amber); color:#0e1f3d; border-color:var(--amber); }
+.btn.primary:hover{ filter:brightness(1.08); color:#0e1f3d; }
+.export-menu{
+  position:absolute; top:calc(100% + 8px); right:0; z-index:40;
+  background:var(--bg-2); border:1px solid var(--border); border-radius:var(--radius-lg);
+  box-shadow:0 12px 30px rgba(0,0,0,0.45);
+  display:none; flex-direction:column; min-width:200px; padding:6px;
+}
+.export-menu.open{ display:flex; }
+.export-menu button, .export-menu label{
+  background:transparent; border:none; color:var(--text); text-align:left;
+  padding:9px 10px; font-size:12.5px; border-radius:var(--radius); font-weight:500;
+}
+.export-menu button:hover, .export-menu label:hover{ background:var(--bg-3); color:var(--amber); cursor:pointer; }
+
+/* ---------------- KPI grid ---------------- */
+.kpi-grid{
+  display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:20px;
+}
+.kpi-card{
+  background:var(--bg-1); border:1px solid var(--border-soft); border-top:2px solid var(--amber);
+  border-radius:var(--radius-lg); padding:14px 14px 12px;
+  display:flex; flex-direction:column; gap:6px; min-height:96px;
+}
+.kpi-card.accent-teal{ border-top-color:var(--teal); }
+.kpi-card.accent-red{ border-top-color:var(--red); }
+.kpi-card.accent-green{ border-top-color:var(--green); }
+.kpi-label{
+  font-size:10.8px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint);
+  font-weight:600;
+}
+.kpi-value{
+  font-family:var(--font-display); font-size:30px; font-weight:700; color:var(--text);
+  letter-spacing:0.01em; line-height:1;
+}
+.kpi-value .unit{ font-size:14px; color:var(--text-dim); font-weight:500; margin-left:4px; font-family:var(--font-body); }
+.kpi-sub{ font-size:11px; color:var(--text-dim); font-family:var(--font-mono); }
+.kpi-sub.up{ color:var(--green); }
+.kpi-sub.down{ color:var(--red); }
+
+/* ---------------- Panels & charts ---------------- */
+.panel{
+  background:var(--bg-1); border:1px solid var(--border-soft); border-radius:var(--radius-lg);
+  padding:16px 16px 10px;
+}
+.panel h3{
+  margin:0 0 10px; font-family:var(--font-display); font-size:17px; letter-spacing:0.03em;
+  color:var(--text-dim); text-transform:uppercase; font-weight:600;
+}
+.charts-grid{
+  display:grid; grid-template-columns: 1.5fr 1fr 1fr; grid-auto-rows:auto; gap:14px; margin-bottom:20px;
+}
+.chart-panel{ position:relative; min-height:250px; }
+.chart-panel canvas{ max-height:230px; max-width:100%; }
+canvas{ max-width:100%; }
+.chart-panel.large{ grid-column: span 3; min-height:290px; }
+.chart-panel.large canvas{ max-height:250px; }
+.gauge-wrap{ position:relative; height:200px; }
+.gauge-value{
+  position:absolute; left:50%; top:60%; transform:translate(-50%,-50%);
+  text-align:center; pointer-events:none;
+}
+.gauge-value .num{ font-family:var(--font-display); font-size:34px; color:var(--amber); font-weight:700; }
+.gauge-value .lbl{ font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em; }
+
+.empty-note{
+  color:var(--text-faint); font-size:13px; padding:30px 10px; text-align:center;
+  border:1px dashed var(--border); border-radius:var(--radius); font-style:italic;
+}
+
+/* ---------------- Table ---------------- */
+.table-panel{ margin-bottom:20px; }
+.table-head{ display:flex; align-items:center; justify-content:space-between; }
+.table-head button{
+  background:transparent; border:1px solid var(--border); color:var(--text-dim);
+  padding:6px 12px; border-radius:var(--radius); font-size:12px;
+}
+.table-scroll{ overflow:auto; max-height:0; transition:max-height .25s ease; }
+.table-scroll.open{ max-height:520px; margin-top:10px; }
+table.data-table{
+  border-collapse:collapse; width:100%; font-size:12px; font-family:var(--font-mono);
+}
+table.data-table th, table.data-table td{
+  padding:6px 9px; border-bottom:1px solid var(--border-soft); text-align:right; white-space:nowrap;
+}
+table.data-table th{
+  position:sticky; top:0; background:var(--bg-2); color:var(--text-dim); text-align:right;
+  font-family:var(--font-body); font-weight:600; font-size:11px; text-transform:uppercase;
+}
+table.data-table td.rowlabel, table.data-table th.rowlabel{
+  text-align:left; position:sticky; left:0; background:var(--bg-1); color:var(--text);
+  font-family:var(--font-body); font-weight:500; min-width:210px;
+}
+table.data-table th.rowlabel{ background:var(--bg-2); }
+table.data-table tr:hover td{ background:rgba(232,169,13,0.06); }
+table.data-table td.today-col, table.data-table th.today-col{ background:rgba(232,169,13,0.09); }
+
+/* ---------------- Stats panel (Excel MTD reference) ---------------- */
+.stats-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:10px;
+}
+.stat-item{
+  background:var(--bg-2); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:10px 12px;
+}
+.stat-item .l{ font-size:10.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.03em; }
+.stat-item .v{ font-family:var(--font-mono); font-size:16px; color:var(--text); margin-top:2px; }
+
+/* ---------------- Modal ---------------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(6,9,13,0.72); backdrop-filter:blur(2px);
+  display:none; align-items:flex-start; justify-content:center; z-index:100; padding:40px 16px;
+}
+.modal-overlay.open{ display:flex; }
+.modal{
+  background:var(--bg-1); border:1px solid var(--border); border-radius:var(--radius-lg);
+  width:100%; max-width:760px; max-height:86vh; display:flex; flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-header{ padding:18px 22px 12px; border-bottom:1px solid var(--border-soft); display:flex; justify-content:space-between; align-items:center; }
+.modal-header h2{ font-family:var(--font-display); font-size:20px; margin:0; letter-spacing:0.02em; }
+.modal-header .sub{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+.modal-body{ padding:16px 22px; overflow:auto; }
+.modal-footer{ padding:14px 22px; border-top:1px solid var(--border-soft); display:flex; justify-content:space-between; gap:10px; }
+.modal-close{ background:transparent; border:none; color:var(--text-dim); font-size:22px; line-height:1; }
+.form-row{ display:grid; grid-template-columns: 1.6fr 0.7fr 0.7fr; gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid var(--border-soft); }
+.form-row label{ font-size:12.5px; color:var(--text-dim); }
+.form-row input{
+  background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:var(--radius);
+  padding:6px 8px; font-size:13px; width:100%; font-family:var(--font-mono);
+}
+.form-cols-head{ display:grid; grid-template-columns: 1.6fr 0.7fr 0.7fr; gap:10px; padding:0 0 6px; }
+.form-cols-head span{ font-size:10.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em; }
+
+/* ---------------- Footer ---------------- */
+.footer-note{ text-align:center; color:var(--text-faint); font-size:11.5px; margin-top:30px; }
+
+/* ---------------- Responsive ---------------- */
+@media (max-width:1100px){
+  .kpi-grid{ grid-template-columns:repeat(3,1fr); }
+  .charts-grid{ grid-template-columns:1fr 1fr; }
+  .chart-panel.large{ grid-column:span 2; }
+  .stats-grid{ grid-template-columns:repeat(2,1fr); }
+}
+@media (max-width:680px){
+  #app{ padding:0 14px 40px; }
+  .topbar{ margin:0 -14px; width:calc(100% + 28px); padding:18px 16px; }
+  .kpi-grid{ grid-template-columns:repeat(2,1fr); gap:8px; }
+  .charts-grid{ grid-template-columns:1fr; }
+  .chart-panel.large{ grid-column:span 1; }
+  .topbar{ flex-direction:column; align-items:flex-start; }
+  .topbar-meta{ align-items:flex-start; text-align:left; width:100%; }
+  .last-update{ text-align:left; }
+  .controls-bar{ flex-direction:column; align-items:stretch; padding:12px; }
+  .mode-toggle, .date-picker{ width:100%; }
+  .mode-toggle button{ flex:1; }
+  .date-picker select, .date-picker input[type="date"]{ flex:1; min-width:0; }
+  .actions{ width:100%; justify-content:flex-start; }
+  .actions .btn{ padding:8px 10px; font-size:11.5px; }
+  .report-caption{ flex-direction:column; gap:6px; }
+  .stats-grid{ grid-template-columns:1fr 1fr; }
+  table.data-table td.rowlabel, table.data-table th.rowlabel{ min-width:150px; }
+}
+@media (max-width:420px){
+  .kpi-grid{ grid-template-columns:1fr 1fr; }
+  .brand-text h1{ font-size:21px; }
+  .brand-mark{ height:44px; }
+}
+
+/* ---------------- Print (A4 export) ---------------- */
+@media print{
+  @page{ size:A4 landscape; margin:8mm; }
+  body{ background:#fff !important; color:#111 !important; }
+  .site-tabs, .controls-bar, .modal-overlay, .footer-note{ display:none !important; }
+  .panel, .kpi-card{ background:#fff !important; border-color:#ccc !important; box-shadow:none !important; }
+  .report-caption{ background:#fff !important; border-color:#ccc !important; color:#333 !important; }
+  .report-caption b{ color:#111 !important; }
+  .kpi-value{ color:#111 !important; }
+  .kpi-label, .panel h3, .kpi-sub, .text-dim{ color:#555 !important; }
+  .table-scroll{ max-height:none !important; }
+  #app{ max-width:100%; padding:0; }
+}
+
+/* ---------------- Date & Month controls (v2) ---------------- */
+input[type="date"]{
+  background:var(--bg); color:var(--text); border:1px solid var(--border);
+  border-radius:var(--radius); padding:7px 10px; font-size:13px; font-family:var(--font-mono);
+  color-scheme: light;
+}
+input[type="date"]:focus{ outline:none; border-color:var(--amber-dim); }
+.month-label{
+  font-family:var(--font-display); font-size:16px; letter-spacing:0.03em; color:var(--text);
+  min-width:120px; text-align:center; text-transform:uppercase;
+}
+.month-nav{ display:flex; align-items:center; gap:6px; }
+.month-nav button{
+  width:28px; height:28px; border-radius:var(--radius); border:1px solid var(--border);
+  background:var(--bg); color:var(--text-dim); font-size:14px;
+}
+.month-nav button:hover{ color:var(--amber); border-color:var(--amber-dim); }
+.add-area-form .form-row{ grid-template-columns: 1fr; gap:4px; border-bottom:none; padding:10px 0; }
+.add-area-form label{ font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; }
+.add-area-form input[type="text"], .add-area-form input[type="date"]{ width:100%; padding:9px 10px; font-size:14px; }
+.field-error{ color:var(--red); font-size:11.5px; margin-top:4px; display:none; }
+.field-error.show{ display:block; }
+.site-tab .site-year{ font-size:10px; color:var(--text-faint); margin-left:4px; }
+
+/* ---------------- Tab rename icon (v3) ---------------- */
+.site-tab{ display:inline-flex; align-items:center; gap:6px; }
+.site-tab .tab-edit{
+  opacity:0; font-size:11px; color:var(--text-faint); padding:2px 3px; border-radius:3px;
+  transition:opacity .15s ease;
+}
+.site-tab:hover .tab-edit{ opacity:0.7; }
+.site-tab .tab-edit:hover{ opacity:1 !important; color:var(--amber); background:var(--bg-2); }
+.site-tab.combined-tab .tab-edit, .site-tab.add-tab .tab-edit{ display:none; }
+
+/* ---------------- Edit lock system (v4) ---------------- */
+.lock-toggle{ font-size:13px; padding:8px 12px; }
+.view-only-note{
+  display:none; background:rgba(232,169,13,0.12); border:1px solid var(--amber-dim);
+  color:var(--amber); font-size:12px; padding:8px 14px; border-radius:var(--radius);
+  margin-bottom:12px; text-align:center;
+}
+body.edit-locked .view-only-note{ display:block; }
+body.edit-locked .edit-only{ display:none !important; }
+body.edit-locked #btnUpdate,
+body.edit-locked #resetData,
+body.edit-locked #btnPriceSettings,
+body.edit-locked #btnSetPlan,
+body.edit-locked .site-tab.add-tab,
+body.edit-locked .site-tab .tab-edit,
+body.edit-locked label.import-label{
+  display:none !important;
+}
+#unlockInput{ width:100%; }
+
+/* ---------------- Cloud sync badge (v5) ---------------- */
+.sync-badge{
+  font-size:11px; padding:6px 10px; border-radius:var(--radius); border:1px solid var(--border);
+  background:var(--bg-1); color:var(--text-dim); white-space:nowrap;
+}
+
+/* ---------------- Report caption (shown in exports) ---------------- */
+.report-caption{
+  display:flex; gap:24px; flex-wrap:wrap;
+  font-family:var(--font-mono); font-size:12.5px; color:var(--text-dim);
+  background:var(--bg-1); border:1px solid var(--border-soft); border-left:3px solid var(--amber);
+  border-radius:var(--radius); padding:9px 14px; margin-bottom:14px;
+}
+.report-caption b{ color:var(--text); font-weight:600; }
+
+/* ---------------- Portal homepage: module cards ---------------- */
+.module-grid{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:24px;
+}
+.module-card{
+  background:var(--bg-1); border:1px solid var(--border-soft); border-radius:var(--radius-lg);
+  padding:22px 20px; text-decoration:none; color:inherit; display:flex; flex-direction:column; gap:10px;
+  transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  cursor:pointer; position:relative; overflow:hidden;
+}
+.module-card:hover{ transform:translateY(-2px); box-shadow:0 10px 26px rgba(14,31,61,0.10); border-color:var(--amber-dim); }
+.module-card .icon{
+  width:52px; height:52px; border-radius:14px; background:var(--bg-2);
+  display:flex; align-items:center; justify-content:center; font-size:26px; flex:none;
+}
+.module-card h3{
+  font-family:var(--font-display); font-size:21px; letter-spacing:0.02em; margin:0; color:var(--text);
+}
+.module-card p{ margin:0; font-size:12.5px; color:var(--text-dim); line-height:1.5; }
+.module-card .status-pill{
+  align-self:flex-start; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;
+  padding:4px 10px; border-radius:20px; margin-top:auto;
+}
+.status-pill.ready{ background:var(--teal-dim); color:var(--teal); }
+.status-pill.empty{ background:var(--bg-2); color:var(--text-faint); }
+.status-pill.locked{ background:var(--red-dim); color:var(--red); }
+.module-card .lock-badge{ position:absolute; top:16px; right:16px; font-size:16px; opacity:0.5; }
+
+/* ---------------- Generic module page ---------------- */
+.upload-zone{
+  border:2px dashed var(--border); border-radius:var(--radius-lg); padding:40px 24px;
+  text-align:center; background:var(--bg-1); transition:border-color .15s ease, background .15s ease;
+}
+.upload-zone.drag-over{ border-color:var(--amber); background:var(--amber-dim); }
+.upload-zone .upload-icon{ font-size:40px; margin-bottom:10px; }
+.upload-zone h3{ font-family:var(--font-display); font-size:20px; margin:8px 0 4px; color:var(--text); }
+.upload-zone p{ color:var(--text-dim); font-size:13px; margin:0 0 16px; }
+.no-data-note{
+  text-align:center; padding:60px 24px; color:var(--text-dim);
+  background:var(--bg-1); border:1px solid var(--border-soft); border-radius:var(--radius-lg);
+}
+.no-data-note .big-icon{ font-size:48px; margin-bottom:14px; opacity:0.6; }
+.no-data-note h3{ font-family:var(--font-display); font-size:22px; color:var(--text); margin:0 0 8px; }
+.no-data-note p{ margin:0; font-size:13.5px; max-width:420px; margin:0 auto; }
+
+.access-gate{
+  max-width:440px; margin:80px auto; text-align:center;
+  background:var(--bg-1); border:1px solid var(--border-soft); border-radius:var(--radius-lg);
+  padding:36px 32px;
+}
+.access-gate .gate-icon{ font-size:44px; margin-bottom:12px; }
+.access-gate h2{ font-family:var(--font-display); font-size:24px; margin:0 0 8px; color:var(--text); }
+.access-gate p{ color:var(--text-dim); font-size:13.5px; margin:0 0 20px; }
+.access-gate input{
+  width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius);
+  background:var(--bg); color:var(--text); font-size:14px; margin-bottom:10px; font-family:var(--font-mono);
+}
+
+.breadcrumb{ display:flex; align-items:center; gap:8px; margin-bottom:18px; font-size:13px; color:var(--text-dim); }
+.breadcrumb a{ color:var(--text-dim); text-decoration:none; }
+.breadcrumb a:hover{ color:var(--amber); }
+
+.generic-table-wrap{ overflow:auto; max-height:70vh; border:1px solid var(--border-soft); border-radius:var(--radius-lg); }
+table.generic-table{ border-collapse:collapse; width:100%; font-size:12.5px; }
+table.generic-table th, table.generic-table td{
+  padding:8px 12px; border-bottom:1px solid var(--border-soft); text-align:left; white-space:nowrap;
+}
+table.generic-table th{
+  position:sticky; top:0; background:var(--bg-2); color:var(--text-dim); font-weight:600;
+  font-size:11px; text-transform:uppercase; z-index:2;
+}
+table.generic-table td:first-child, table.generic-table th:first-child{ position:sticky; left:0; background:var(--bg-1); z-index:1; }
+table.generic-table th:first-child{ background:var(--bg-2); z-index:3; }
+table.generic-table tr:hover td{ background:rgba(232,169,13,0.06); }
+
+.cashflow-summary-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.detail-lock-note{
+  display:flex; align-items:center; gap:10px; background:var(--bg-2); border:1px solid var(--border-soft);
+  border-radius:var(--radius); padding:12px 16px; font-size:12.5px; color:var(--text-dim); margin-bottom:16px;
+}
+
+@media (max-width:1000px){ .module-grid{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:640px){ .module-grid{ grid-template-columns:1fr; } .cashflow-summary-grid{ grid-template-columns:1fr; } }
+
+/* ---------------- Roster timeline ---------------- */
+.tl-legend{ display:flex; gap:18px; font-size:11.5px; color:var(--text-dim); margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+.tl-legend span{ display:flex; align-items:center; gap:6px; }
+.tl-dot{ width:10px; height:10px; border-radius:3px; display:inline-block; flex:none; }
+.tl-dot.tl-prev{ background:var(--border); }
+.tl-dot.tl-actual{ background:var(--red); }
+.tl-dot.tl-next{ background:var(--amber); }
+.tl-dot.tl-today{ background:var(--teal); width:2px; height:14px; border-radius:0; }
+.tl-scroll{ overflow-x:auto; }
+.tl-chart{ position:relative; min-width:640px; }
+.tl-today-line{ position:absolute; top:0; bottom:0; width:2px; background:var(--teal); z-index:3; pointer-events:none; }
+.tl-row{ display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px solid var(--border-soft); position:relative; }
+.tl-name{
+  width:170px; flex:none; font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  position:sticky; left:0; background:var(--bg-1); z-index:2; padding-right:8px;
+}
+.tl-track{ position:relative; flex:1; height:18px; background:var(--bg-2); border-radius:3px; z-index:1; }
+.tl-bar{ position:absolute; top:1px; bottom:1px; border-radius:2px; z-index:1; }
+.tl-bar.tl-prev{ background:var(--border); opacity:0.8; }
+.tl-bar.tl-actual{ background:var(--red); }
+.tl-bar.tl-next{ background:var(--amber); }
+
+/* ---------------- Sidebar navigation (persistent across all modules) ---------------- */
+.app-shell{ display:flex; min-height:100vh; }
+.sidebar{
+  width:230px; flex:none; background:linear-gradient(180deg, var(--brand-dark) 0%, var(--brand-dark-2) 100%);
+  display:flex; flex-direction:column; padding:22px 0; position:sticky; top:0; height:100vh; overflow-y:auto;
+}
+.sidebar-brand{ display:flex; align-items:center; gap:10px; padding:0 18px 18px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:14px; }
+.sidebar-brand img{ width:36px; height:36px; object-fit:contain; border-radius:6px; background:#f8f7f2; padding:3px; flex:none; }
+.sidebar-brand .name{ font-family:var(--font-display); font-size:13px; font-weight:700; color:#fff; line-height:1.25; letter-spacing:0.01em; }
+.sidebar-nav{ flex:1; display:flex; flex-direction:column; gap:2px; padding:0 12px; }
+.sidebar-nav a{
+  display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius);
+  color:#c7d2e0; text-decoration:none; font-size:13.5px; font-weight:500; transition:background .12s ease, color .12s ease;
+}
+.sidebar-nav a .icon{ font-size:15px; width:18px; text-align:center; flex:none; }
+.sidebar-nav a:hover{ background:rgba(255,255,255,0.08); color:#fff; }
+.sidebar-nav a.active{ background:rgba(232,169,13,0.16); color:var(--amber); font-weight:700; }
+.sidebar-nav .divider{ height:1px; background:rgba(255,255,255,0.1); margin:10px 12px; }
+.sidebar-footer{ padding:14px 18px 0; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px; }
+.sidebar-footer .lang-toggle{ width:100%; }
+.sidebar-footer .lang-toggle button{ flex:1; }
+.main-content{ flex:1; min-width:0; width:100%; max-width:100%; overflow-x:clip; padding:0 24px 40px; }
+.main-content .topbar{ margin:0 -24px; width:calc(100% + 48px); border-radius:0 0 14px 14px; }
+.main-content .hazard-strip{ margin-bottom:20px; }
+
+@media (max-width:900px){
+  .app-shell{ flex-direction:column; }
+  .sidebar{ width:100%; height:auto; position:relative; flex-direction:row; align-items:center; padding:12px 14px; overflow-x:auto; }
+  .sidebar-brand{ border-bottom:none; margin-bottom:0; padding:0 12px 0 0; border-right:1px solid rgba(255,255,255,0.12); }
+  .sidebar-nav{ flex-direction:row; padding:0 0 0 12px; overflow-x:auto; }
+  .sidebar-nav a{ white-space:nowrap; }
+  .sidebar-nav .divider{ display:none; }
+  .sidebar-footer{ display:none; }
+  .main-content{ padding:0 14px 40px; }
+  .main-content .topbar{ margin:0 -14px; width:calc(100% + 28px); }
+}
+
+</style>
+<style>
+  .cat-tabs{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .cat-tab{ background:var(--bg-2); border:1px solid var(--border); color:var(--text-dim); padding:7px 14px; border-radius:var(--radius); font-size:12.5px; font-weight:600; }
+  .cat-tab.active{ background:var(--teal); color:#fff; border-color:var(--teal); }
+  .status-within{ color:var(--green); font-weight:600; }
+  .status-above{ color:var(--red); font-weight:600; }
+</style>
+</head>
+<body class="edit-locked">
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img src="data:image/jpeg;base64,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" alt="logo">
+      <div class="name">PT. Teknologi<br>Infrastruktur Indonesia</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="Portal_Home.html"><span class="icon">🏠</span><span data-i18n="sidebarHome">Beranda</span></a>
+      <a href="Hauling_Operations_Dashboard.html"><span class="icon">🚛</span><span data-i18n="sidebarHauling">Hauling Dashboard</span></a>
+      <a href="Roster_Cuti_Engineering.html"><span class="icon">🌴</span><span data-i18n="sidebarRoster">Roster Cuti</span></a>
+      <a href="Distance_Hauling_Monitoring.html"><span class="icon">📍</span><span data-i18n="sidebarDistance">Distance Hauling</span></a>
+      <a href="Fuel_Monitoring.html" class="active"><span class="icon">⛽</span><span data-i18n="sidebarFuel">Fuel Monitoring</span></a>
+      <a href="Performance_Operator.html"><span class="icon">👷</span><span data-i18n="sidebarPerformance">Performance Operator</span></a>
+      <a href="Cashflow.html"><span class="icon">💰</span><span data-i18n="sidebarCashflow">Cashflow</span></a>
+      <a href="Rental_Unit_Monitoring.html"><span class="icon">🚜</span><span data-i18n="sidebarRental">Rental Unit</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="lang-toggle" id="sidebarLangToggle">
+        <button data-lang="id" class="active">ID</button>
+        <button data-lang="en">EN</button>
+      </div>
+    </div>
+  </aside>
+  <div class="main-content" id="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><img src="data:image/jpeg;base64,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" alt="logo" class="brand-logo-img"></div>
+      <div class="brand-text">
+        <h1>Fuel Monitoring</h1>
+        <p data-i18n="subtitle">PT. Teknologi Infrastruktur Indonesia — Konsumsi BBM vs Rencana</p>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <div class="sync-badge" id="onlineBadge">🌐 Online</div>
+      <div class="sync-badge" id="syncBadge" style="display:none;"></div>
+      <button class="btn lock-toggle" id="editLockToggle">🔒</button>
+      <div id="liveClock">—</div>
+    </div>
+  </header>
+  <div class="hazard-strip"></div>
+
+  <div class="controls-bar">
+    <div class="actions">
+      <button class="btn" id="btnHistory" data-i18n="btnHistory">📜 Riwayat</button>
+      <button class="btn edit-only" id="btnAddDay" data-i18n="btnAddDay">+ Tambah/Ubah Tanggal</button>
+      <button class="btn edit-only" id="btnUploadExcel" data-i18n="btnUploadExcel">📤 Upload Excel</button>
+      <button class="btn edit-only" id="btnDieselPrice" data-i18n="btnDieselPrice">💲 Harga Solar</button>
+      <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none;">
+      <button class="btn" id="btnExportMenu" data-i18n="btnExport">Export ▾</button>
+      <div class="export-menu" id="exportMenu">
+        <button data-export="pdf" data-i18n="exportPDF">🖨 Export PDF (A4)</button>
+        <button data-export="png" data-i18n="exportPNG">🖼 Export PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="kpi-grid" id="kpiGrid"></section>
+
+  <section class="panel" style="margin-bottom:20px;">
+    <h3 data-i18n="chartTitle">Tren Fuel Ratio Harian: Aktual vs Rencana (L/ton/km)</h3>
+    <canvas id="chartFR" style="max-height:280px;"></canvas>
+  </section>
+
+  <section class="panel table-panel" style="margin-bottom:20px;">
+    <div class="table-head"><h3 style="margin:0;" data-i18n="routeTableTitle">Performa Fuel per Rute Hauling (Bulan Berjalan)</h3></div>
+    <div class="table-scroll open" id="routeTableWrap"></div>
+  </section>
+
+  <section class="panel table-panel" style="margin-bottom:20px;">
+    <div class="table-head"><h3 style="margin:0;" data-i18n="unitTableTitle">Konsumsi Fuel per Unit &amp; Kategori</h3></div>
+    <div class="cat-tabs" id="catTabs"></div>
+    <div class="table-scroll open" id="unitTableWrap"></div>
+    <p style="font-size:11.5px; color:var(--text-faint); margin-top:10px;" data-i18n="unitTableNote">Catatan: Excavator, Genset, Fuel Truck, dan unit non-hauling lain tidak menghasilkan tonase, sehingga dievaluasi dengan Fuel/HM (jam mesin), bukan L/ton/km.</p>
+  </section>
+
+  <section class="panel table-panel">
+    <div class="table-head"><h3 style="margin:0;" data-i18n="dailyTableTitle">Data Harian Fuel</h3></div>
+    <div class="table-scroll open" id="fuelTableWrap"></div>
+  </section>
+
+  <p class="footer-note" data-i18n="footerNote">Fuel Monitoring · PT. Teknologi Infrastruktur Indonesia · data tersinkron otomatis dan tercatat riwayat perubahannya.</p>
+</div>
+</div>
+
+<div class="modal-overlay" id="unlockModal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <div><h2 data-i18n="unlockTitle">Masukkan Kode Edit</h2></div>
+      <button class="modal-close" id="unlockModalClose">&times;</button>
+    </div>
+    <div class="modal-body add-area-form">
+      <div class="form-row" id="unlockNameRow">
+        <label data-i18n="yourName">Nama Anda</label>
+        <input type="text" id="unlockNameInput" data-i18n-placeholder="yourNamePlaceholder" placeholder="Nama untuk dicatat di riwayat">
+      </div>
+      <div class="form-row">
+        <input type="password" id="unlockCodeInput" data-i18n-placeholder="editCode" placeholder="Kode edit">
+        <div class="field-error" id="unlockErr" style="display:none;"></div>
+        <button class="btn" id="forceUnlockBtn" data-i18n="forceUnlock" style="display:none; margin-top:8px; width:100%; color:var(--red);">🔓 Buka Paksa (ambil alih kunci macet)</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span></span>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="cancelUnlockBtn" data-i18n="cancel">Batal</button>
+        <button class="btn primary" id="confirmUnlockBtn" data-i18n="unlock">Unlock</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="dayModal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <div><h2 id="dayModalTitle" data-i18n="dayModalTitle">Tambah / Ubah Data Harian</h2></div>
+      <button class="modal-close" id="dayModalClose">&times;</button>
+    </div>
+    <div class="modal-body add-area-form">
+      <div class="form-row"><label data-i18n="date">Tanggal</label><input type="date" id="fDate"></div>
+      <div class="form-row"><label data-i18n="qtyFuel">Qty Fuel (Liter)</label><input type="number" step="any" id="fQtyFuel"></div>
+      <div class="form-row"><label data-i18n="qtyTonnage">Qty Tonase (Ton)</label><input type="number" step="any" id="fQtyTonnage"></div>
+      <div class="form-row"><label data-i18n="frPlan">FR Plan (L/ton/km)</label><input type="number" step="any" id="fFRPlan"></div>
+      <div class="form-row"><label data-i18n="tonKm">Ton-KM Harian (opsional)</label><input type="number" step="any" id="fTonKm"></div>
+      <p style="font-size:11.5px; color:var(--text-faint); margin:4px 0 0;" data-i18n="tonKmNote">Ton-KM = jumlah (jarak × tonase) tiap rute hari itu. Kosongkan kalau tidak tahu — FR aktual hanya dihitung kalau nilai ini diisi.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="deleteDayBtn" style="color:var(--red); border-color:var(--red-dim);" data-i18n="delete">Hapus</button>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="cancelDayBtn" data-i18n="cancel">Batal</button>
+        <button class="btn primary" id="saveDayBtn" data-i18n="save">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="dieselPriceModal">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <div><h2 data-i18n="dieselPriceModalTitle">Harga Solar Hari Ini</h2></div>
+      <button class="modal-close" id="dieselPriceModalClose">&times;</button>
+    </div>
+    <div class="modal-body add-area-form">
+      <p style="font-size:12px; color:var(--text-faint); margin-top:-4px;" data-i18n="dieselPriceModalNote">Diisi manual karena harga solar dunia berubah tiap hari. Dipakai untuk menghitung estimasi kerugian/penghematan dari selisih Fuel Ratio.</p>
+      <div class="form-row">
+        <label data-i18n="dieselPriceLabel">Harga Solar (Rp per Liter)</label>
+        <input type="number" id="dieselPriceInput" min="0" step="1" placeholder="contoh: 12500">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span></span>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="cancelDieselPriceBtn" data-i18n="cancel">Batal</button>
+        <button class="btn primary" id="saveDieselPriceBtn" data-i18n="save">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="uploadPreviewModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div><h2 data-i18n="uploadPreviewTitle">Pratinjau Data Excel</h2></div>
+      <button class="modal-close" id="uploadPreviewModalClose">&times;</button>
+    </div>
+    <div class="modal-body"><div id="uploadPreviewBody"></div></div>
+    <div class="modal-footer">
+      <span></span>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="cancelUploadBtn" data-i18n="cancel">Batal</button>
+        <button class="btn primary" id="confirmUploadBtn" data-i18n="confirmUpload">Gunakan Data Ini</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="historyModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div><h2 data-i18n="historyTitle">Riwayat Perubahan</h2></div>
+      <button class="modal-close" id="historyModalClose">&times;</button>
+    </div>
+    <div class="modal-body"><div id="historyBody"></div></div>
+    <div class="modal-footer"><span></span><button class="btn" id="closeHistoryBtn" data-i18n="close">Tutup</button></div>
+  </div>
+</div>
+
+<script>window.__FUEL_SEED__ = [{"date":"2026-07-01","qtyFuel":9189,"qtyTonnage":31837.02,"frPlan":0.089,"tonKm":64043.4},{"date":"2026-07-02","qtyFuel":9616,"qtyTonnage":37789.0,"frPlan":0.089,"tonKm":105910.8},{"date":"2026-07-03","qtyFuel":10944,"qtyTonnage":35477.76,"frPlan":0.089,"tonKm":84268.1},{"date":"2026-07-04","qtyFuel":11045,"qtyTonnage":36876.28,"frPlan":0.089,"tonKm":108877.4},{"date":"2026-07-05","qtyFuel":11147,"qtyTonnage":37631.28,"frPlan":0.089,"tonKm":92597.2},{"date":"2026-07-06","qtyFuel":11431,"qtyTonnage":36057.79,"frPlan":0.089,"tonKm":102084.2},{"date":"2026-07-07","qtyFuel":11659,"qtyTonnage":37763.0,"frPlan":0.089,"tonKm":86030.1},{"date":"2026-07-08","qtyFuel":8554,"qtyTonnage":33365.13,"frPlan":0.089,"tonKm":80192.5},{"date":"2026-07-09","qtyFuel":11119,"qtyTonnage":36764.23,"frPlan":0.089,"tonKm":109194.3},{"date":"2026-07-10","qtyFuel":10990,"qtyTonnage":35554.88,"frPlan":0.089,"tonKm":98409.8},{"date":"2026-07-11","qtyFuel":11778,"qtyTonnage":37819.14,"frPlan":0.089,"tonKm":104774.1},{"date":"2026-07-12","qtyFuel":11159,"qtyTonnage":35964.32,"frPlan":0.089,"tonKm":96380.6},{"date":"2026-07-13","qtyFuel":10936,"qtyTonnage":33349.09,"frPlan":0.089,"tonKm":91890.2},{"date":"2026-07-14","qtyFuel":11552,"qtyTonnage":33636.1,"frPlan":0.089,"tonKm":143361.9},{"date":"2026-07-15","qtyFuel":12819,"qtyTonnage":31635.08,"frPlan":0.089,"tonKm":142854.2},{"date":"2026-07-16","qtyFuel":14018,"qtyTonnage":31494.22,"frPlan":0.089,"tonKm":177925.8},{"date":"2026-07-17","qtyFuel":13113,"qtyTonnage":29394.33,"frPlan":0.089,"tonKm":146080.0},{"date":"2026-07-18","qtyFuel":12767,"qtyTonnage":29353.49,"frPlan":0.089,"tonKm":201940.5},{"date":"2026-07-19","qtyFuel":14330,"qtyTonnage":29797.48,"frPlan":0.089,"tonKm":146741.5},{"date":"2026-07-20","qtyFuel":13056,"qtyTonnage":29009.95,"frPlan":0.089,"tonKm":168519.7},{"date":"2026-07-21","qtyFuel":13697,"qtyTonnage":31092.36,"frPlan":0.089,"tonKm":190408.9},{"date":"2026-07-22","qtyFuel":13875,"qtyTonnage":29784.43,"frPlan":0.089,"tonKm":134689.6},{"date":"2026-07-23","qtyFuel":13531,"qtyTonnage":28754.8,"frPlan":0.089,"tonKm":154239.9},{"date":"2026-07-24","qtyFuel":11887,"qtyTonnage":30351.92,"frPlan":0.089,"tonKm":140067.0},{"date":"2026-07-25","qtyFuel":12935,"qtyTonnage":30015.99,"frPlan":0.089,"tonKm":139900.9},{"date":"2026-07-26","qtyFuel":null,"qtyTonnage":0,"frPlan":0.089,"tonKm":null},{"date":"2026-07-27","qtyFuel":null,"qtyTonnage":0,"frPlan":0.089,"tonKm":null},{"date":"2026-07-28","qtyFuel":null,"qtyTonnage":0,"frPlan":0.089,"tonKm":null},{"date":"2026-07-29","qtyFuel":null,"qtyTonnage":0,"frPlan":0.089,"tonKm":null},{"date":"2026-07-30","qtyFuel":null,"qtyTonnage":0,"frPlan":0.089,"tonKm":null}];</script>
+<script>window.__FUEL_KPI__ = {"mtdProduction":830569.0699999988,"mtdFuel":337681.1000000001,"weightedDistance":3.7460854781264605,"fuelRatioLimit":0.089,"mtdQueueHours":11972.552222221348,"activeUnits":null,"avgDailyProduction":null};</script>
+<script>window.__FUEL_ROUTES__ = [{"area":"L44_03 - ESG","production":235559.72,"distanceKm":3.508,"allocatedFuel":60127,"fuelRatio":0.07276,"limit":0.089,"status":"WITHIN LIMIT","queueHours":3627.8},{"area":"L37_12 - ESG","production":125921.23,"distanceKm":2.624,"allocatedFuel":26986,"fuelRatio":0.08168,"limit":0.089,"status":"WITHIN LIMIT","queueHours":1796.533},{"area":"L29_07 - ESG","production":186363.56,"distanceKm":2.581,"allocatedFuel":26747,"fuelRatio":0.0556,"limit":0.089,"status":"WITHIN LIMIT","queueHours":2375.467},{"area":"L31_14 - ESG","production":90304.0,"distanceKm":5.45,"allocatedFuel":24081,"fuelRatio":0.04893,"limit":0.089,"status":"WITHIN LIMIT","queueHours":1497.3},{"area":"L14_S03 - ESG","production":15168.97,"distanceKm":2.761,"allocatedFuel":10460,"fuelRatio":0.24974,"limit":0.089,"status":"ABOVE LIMIT","queueHours":195.833},{"area":"L21_01 - ESG","production":73119.23,"distanceKm":7.875,"allocatedFuel":36916,"fuelRatio":0.06411,"limit":0.089,"status":"WITHIN LIMIT","queueHours":1092.183},{"area":"ALL LOCATIONS","production":830569.07,"distanceKm":3.746,"allocatedFuel":337681.1,"fuelRatio":0.10853,"limit":0.089,"status":"ABOVE LIMIT","queueHours":10585.117}];</script>
+<script>window.__FUEL_UNITS__ = [{"unit":"EX 005","category":"Excavator","type":"938E HD","fuelUsed":12293,"production":0,"weightedDistance":0,"area":"L 44","fuelRatio":null,"fuelPerHM":27.167,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"EX 004","category":"Excavator","type":"938E HD","fuelUsed":12382,"production":0,"weightedDistance":0,"area":"L 37","fuelRatio":null,"fuelPerHM":27.382,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"EX 009","category":"Excavator","type":938,"fuelUsed":12051,"production":0,"weightedDistance":0,"area":"L 37","fuelRatio":null,"fuelPerHM":12.843,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"EX 006","category":"Excavator","type":"938E HD","fuelUsed":11539,"production":0,"weightedDistance":0,"area":"L 44","fuelRatio":null,"fuelPerHM":3.301,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"EX 007","category":"Excavator","type":"938E HD","fuelUsed":11036,"production":0,"weightedDistance":0,"area":"L 29","fuelRatio":null,"fuelPerHM":3.474,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"EX 002","category":"Excavator","type":"938E HD","fuelUsed":12030,"production":0,"weightedDistance":0,"area":"L 44","fuelRatio":null,"fuelPerHM":14.09,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"EX 001","category":"Excavator","type":"938E HD","fuelUsed":6565,"production":0,"weightedDistance":0,"area":"L 37","fuelRatio":null,"fuelPerHM":9.464,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 075","category":"Dump Truck","type":"K51Y","fuelUsed":5033,"production":19190.74,"weightedDistance":3.886,"area":"L31_15 - ESG","fuelRatio":0.06749,"fuelPerHM":0.548,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 035","category":"Dump Truck","type":"K51Y","fuelUsed":4593,"production":17949.22,"weightedDistance":3.679,"area":"L21_01 - ESG","fuelRatio":0.06955,"fuelPerHM":7.066,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 032","category":"Dump Truck","type":"K51Y","fuelUsed":4458,"production":20380.11,"weightedDistance":3.822,"area":"L31_15 - ESG","fuelRatio":0.05724,"fuelPerHM":6.481,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 003","category":"Dump Truck","type":"K51Y","fuelUsed":4677,"production":18797.99,"weightedDistance":3.43,"area":"L21_01 - ESG","fuelRatio":0.07253,"fuelPerHM":12.489,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 038","category":"Dump Truck","type":"K51Y","fuelUsed":4901,"production":17915.48,"weightedDistance":3.52,"area":"L31_15 - ESG","fuelRatio":0.07772,"fuelPerHM":1.24,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 023","category":"Dump Truck","type":"K51Y","fuelUsed":4520,"production":17682.08,"weightedDistance":3.231,"area":"L31_15 - ESG","fuelRatio":0.07911,"fuelPerHM":4.694,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 036","category":"Dump Truck","type":"K51Y","fuelUsed":4589,"production":18910.69,"weightedDistance":4.236,"area":"L21_01 - ESG","fuelRatio":0.05729,"fuelPerHM":1.442,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 022","category":"Dump Truck","type":"K51Y","fuelUsed":3614,"production":17212.89,"weightedDistance":3.275,"area":"L44_03 - ESG","fuelRatio":0.06412,"fuelPerHM":0.058,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 016","category":"Dump Truck","type":"K51Y","fuelUsed":4470,"production":14343.98,"weightedDistance":3.776,"area":"L21_01 - ESG","fuelRatio":0.08253,"fuelPerHM":12.479,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 029","category":"Dump Truck","type":"K51Y","fuelUsed":4416,"production":17974.49,"weightedDistance":3.353,"area":"L31_15 - ESG","fuelRatio":0.07327,"fuelPerHM":10.562,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 026","category":"Dump Truck","type":"K51Y","fuelUsed":4265,"production":18445.08,"weightedDistance":3.182,"area":"S13_L01 - ESG","fuelRatio":0.07266,"fuelPerHM":0.8,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 021","category":"Dump Truck","type":"K51Y","fuelUsed":5019,"production":19236.62,"weightedDistance":3.44,"area":"L31_15 - ESG","fuelRatio":0.07585,"fuelPerHM":11.48,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 040","category":"Dump Truck","type":"K51Y","fuelUsed":3868,"production":17954.56,"weightedDistance":3.802,"area":"S13_L01 - ESG","fuelRatio":0.05667,"fuelPerHM":9.393,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 076","category":"Dump Truck","type":"K51Y","fuelUsed":4145,"production":17977.34,"weightedDistance":3.503,"area":"L44_03 - ESG","fuelRatio":0.06581,"fuelPerHM":9.959,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 007","category":"Dump Truck","type":"K51Y","fuelUsed":4315,"production":18617.31,"weightedDistance":3.112,"area":"L31_15 - ESG","fuelRatio":0.07447,"fuelPerHM":10.061,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 030","category":"Dump Truck","type":"K51Y","fuelUsed":4220,"production":20079.49,"weightedDistance":3.563,"area":"L14_PP01 - ESG","fuelRatio":0.05898,"fuelPerHM":4.19,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 034","category":"Dump Truck","type":"K51Y","fuelUsed":4091,"production":15533.2,"weightedDistance":3.98,"area":"L21_01 - ESG","fuelRatio":0.06618,"fuelPerHM":0.596,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 071","category":"Dump Truck","type":"K51Y","fuelUsed":3814,"production":18984.59,"weightedDistance":4.069,"area":"L31_15 - ESG","fuelRatio":0.04938,"fuelPerHM":9.441,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 077","category":"Dump Truck","type":"K51Y","fuelUsed":4649,"production":16062.24,"weightedDistance":3.68,"area":"L21_01 - ESG","fuelRatio":0.07865,"fuelPerHM":1.0,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 005","category":"Dump Truck","type":"K51Y","fuelUsed":4262,"production":18859.86,"weightedDistance":3.569,"area":"S13_L01 - ESG","fuelRatio":0.06332,"fuelPerHM":7.317,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 073","category":"Dump Truck","type":"K51Y","fuelUsed":4533,"production":17061.92,"weightedDistance":3.933,"area":"L21_01 - ESG","fuelRatio":0.06755,"fuelPerHM":0.729,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 010","category":"Dump Truck","type":"K51Y","fuelUsed":3961,"production":20067.4,"weightedDistance":3.514,"area":"S13_L01 - ESG","fuelRatio":0.05618,"fuelPerHM":8.771,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 009","category":"Dump Truck","type":"K51Y","fuelUsed":3689,"production":16783.17,"weightedDistance":3.271,"area":"L44_03 - ESG","fuelRatio":0.0672,"fuelPerHM":3.288,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 004","category":"Dump Truck","type":"K51Y","fuelUsed":4549,"production":20024.48,"weightedDistance":3.692,"area":"L31_15 - ESG","fuelRatio":0.06153,"fuelPerHM":11.358,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 072","category":"Dump Truck","type":"K51Y","fuelUsed":4309,"production":19733.3,"weightedDistance":4.231,"area":"L31_15 - ESG","fuelRatio":0.05161,"fuelPerHM":9.4,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 039","category":"Dump Truck","type":"K51Y","fuelUsed":4378,"production":19414.32,"weightedDistance":4.577,"area":"L21_01 - ESG","fuelRatio":0.04927,"fuelPerHM":9.779,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 005 km and fuel are proportional to production."},{"unit":"DT 033","category":"Dump Truck","type":"K51Y","fuelUsed":4106,"production":17089.94,"weightedDistance":3.83,"area":"L21_01 - ESG","fuelRatio":0.06274,"fuelPerHM":10.356,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 078","category":"Dump Truck","type":"K51Y","fuelUsed":4545,"production":17911.47,"weightedDistance":3.833,"area":"L31_15 - ESG","fuelRatio":0.0662,"fuelPerHM":1.135,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 025","category":"Dump Truck","type":"K51Y","fuelUsed":3387,"production":12320.29,"weightedDistance":3.405,"area":"L31_15 - ESG","fuelRatio":0.08074,"fuelPerHM":0.454,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 020","category":"Dump Truck","type":"K51Y","fuelUsed":4549,"production":17198.23,"weightedDistance":3.944,"area":"L31_15 - ESG","fuelRatio":0.06706,"fuelPerHM":2.852,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 031","category":"Dump Truck","type":"K51Y","fuelUsed":3972,"production":17170.83,"weightedDistance":3.536,"area":"L31_15 - ESG","fuelRatio":0.06541,"fuelPerHM":0.917,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 037","category":"Dump Truck","type":"K51Y","fuelUsed":3829,"production":16970.88,"weightedDistance":4.223,"area":"L31_15 - ESG","fuelRatio":0.05342,"fuelPerHM":0.741,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 012","category":"Dump Truck","type":"K51Y","fuelUsed":2920,"production":15015.22,"weightedDistance":3.143,"area":"L21_01 - ESG","fuelRatio":0.06188,"fuelPerHM":1.797,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 046","category":"Dump Truck","type":"K24Y","fuelUsed":3276.7,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":10.68,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 058","category":"Dump Truck","type":"K24Y","fuelUsed":3453.0,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":1.23,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 079","category":"Dump Truck","type":"K51Y","fuelUsed":4152,"production":16700.74,"weightedDistance":3.807,"area":"L21_01 - ESG","fuelRatio":0.0653,"fuelPerHM":0.733,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 074","category":"Dump Truck","type":"K51Y","fuelUsed":3921,"production":18918.67,"weightedDistance":3.691,"area":"L31_15 - ESG","fuelRatio":0.05616,"fuelPerHM":4.928,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 011","category":"Dump Truck","type":"K51Y","fuelUsed":2173,"production":12320.96,"weightedDistance":2.655,"area":"L14_S03 - ESG","fuelRatio":0.06643,"fuelPerHM":0.479,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 048","category":"Dump Truck","type":"K24Y","fuelUsed":2804.3,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":9.114,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 001","category":"Dump Truck","type":"K51Y","fuelUsed":3347,"production":16494.61,"weightedDistance":3.036,"area":"L31_15 - ESG","fuelRatio":0.06685,"fuelPerHM":9.482,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 049","category":"Dump Truck","type":"K24Y","fuelUsed":2591.9,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":11.911,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 055","category":"Dump Truck","type":"K24Y","fuelUsed":2611.9,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":12.766,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 056","category":"Dump Truck","type":"K24Y","fuelUsed":3341.1,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":6.769,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 017","category":"Dump Truck","type":"K51Y","fuelUsed":3677,"production":17572.94,"weightedDistance":3.508,"area":"L31_15 - ESG","fuelRatio":0.05965,"fuelPerHM":0.729,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 019","category":"Dump Truck","type":"K51Y","fuelUsed":2788,"production":10876.26,"weightedDistance":2.934,"area":"L21_01 - ESG","fuelRatio":0.08737,"fuelPerHM":1.954,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 013","category":"Dump Truck","type":"K51Y","fuelUsed":3466,"production":15685.68,"weightedDistance":3.501,"area":"L31_15 - ESG","fuelRatio":0.06312,"fuelPerHM":9.598,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DZ 001","category":"Dozer","type":"CLGB230","fuelUsed":5856,"production":0,"weightedDistance":0,"area":"L26","fuelRatio":null,"fuelPerHM":2.667,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 008","category":"Dump Truck","type":"K51Y","fuelUsed":3430,"production":14979.78,"weightedDistance":3.215,"area":"L39_02 - SLNC","fuelRatio":0.07122,"fuelPerHM":5.995,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 052","category":"Dump Truck","type":"K24Y","fuelUsed":2650,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":2.598,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"WT 003","category":"Water Truck","type":"HINO 500","fuelUsed":1978,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.023,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 054","category":"Dump Truck","type":"K24Y","fuelUsed":3014.4,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":1.184,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 059","category":"Dump Truck","type":"K24Y","fuelUsed":2388.8,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":11.397,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 051","category":"Dump Truck","type":"K24Y","fuelUsed":2941.7,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":9.911,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 080","category":"Dump Truck","type":"K51Y","fuelUsed":3544,"production":15989.14,"weightedDistance":4.229,"area":"L31_15 - ESG","fuelRatio":0.05241,"fuelPerHM":0.518,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 015","category":"Dump Truck","type":"K51Y","fuelUsed":1830,"production":6559.1,"weightedDistance":3.183,"area":"L31_14 - ESG","fuelRatio":0.08765,"fuelPerHM":0.343,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"DT 081","category":"Dump Truck","type":"K51Y","fuelUsed":3268,"production":9567.32,"weightedDistance":4.212,"area":"L21_01 - ESG","fuelRatio":0.0811,"fuelPerHM":8.401,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"GS 004","category":"Genset","type":"INTERGEN","fuelUsed":2062,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":6.834,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 057","category":"Dump Truck","type":"K24Y","fuelUsed":1573.5,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":2.199,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 083","category":"Dump Truck","type":"K51Y","fuelUsed":3015,"production":11364.49,"weightedDistance":4.565,"area":"L39_02 - SLNC","fuelRatio":0.05811,"fuelPerHM":0.461,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 005 km and fuel are proportional to production."},{"unit":"DT 024","category":"Dump Truck","type":"K51Y","fuelUsed":2636,"production":9991.27,"weightedDistance":4.262,"area":"L31_15 - ESG","fuelRatio":0.0619,"fuelPerHM":1.29,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 084","category":"Dump Truck","type":"K51Y","fuelUsed":2901,"production":9910.64,"weightedDistance":5.253,"area":"L21_01 - ESG","fuelRatio":0.05572,"fuelPerHM":10.89,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 005 km and fuel are proportional to production."},{"unit":"DT 082","category":"Dump Truck","type":"K51Y","fuelUsed":3079,"production":12582.71,"weightedDistance":4.952,"area":"L21_01 - ESG","fuelRatio":0.04941,"fuelPerHM":0.351,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 005 km and fuel are proportional to production."},{"unit":"DT 085","category":"Dump Truck","type":"K51Y","fuelUsed":3194,"production":9189.01,"weightedDistance":4.786,"area":"L21_01 - ESG","fuelRatio":0.07263,"fuelPerHM":13.182,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 005 km and fuel are proportional to production."},{"unit":"DT 014","category":"Dump Truck","type":"K51Y","fuelUsed":1416,"production":5852.18,"weightedDistance":3.541,"area":"L31_14 - ESG","fuelRatio":0.06833,"fuelPerHM":0.952,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 004 km and fuel are proportional to production."},{"unit":"DT 006","category":"Dump Truck","type":"K51Y","fuelUsed":1005,"production":6818.1,"weightedDistance":2.551,"area":"L29_07 - ESG","fuelRatio":0.05778,"fuelPerHM":8.87,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 003 km and fuel are proportional to production."},{"unit":"FT 001","category":"Fuel Truck","type":"KQ6Y","fuelUsed":1726,"production":0,"weightedDistance":0,"area":"L 29","fuelRatio":null,"fuelPerHM":0.543,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"CP 002","category":"Compactor","type":"6611E","fuelUsed":1308,"production":0,"weightedDistance":0,"area":"L 37","fuelRatio":null,"fuelPerHM":0.042,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"WT 002","category":"Water Truck","type":"XCMG","fuelUsed":1009,"production":0,"weightedDistance":0,"area":"DS","fuelRatio":null,"fuelPerHM":3.941,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"GS 003","category":"Genset","type":"INTERGEN","fuelUsed":1568,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":3.203,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"MG 002","category":"Motor Grader","type":"CLG430D","fuelUsed":1058,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":11.137,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 087","category":"Dump Truck","type":"K51Y","fuelUsed":1923,"production":5796.65,"weightedDistance":5.975,"area":"S13_L01 - ESG","fuelRatio":0.05552,"fuelPerHM":13.162,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 006 km and fuel are proportional to production."},{"unit":"WT 001","category":"Water Truck","type":"XCMG","fuelUsed":1154,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.216,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 086","category":"Dump Truck","type":"K51Y","fuelUsed":2187,"production":7762.92,"weightedDistance":5.524,"area":"L31_15 - ESG","fuelRatio":0.051,"fuelPerHM":0.297,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 006 km and fuel are proportional to production."},{"unit":"DT 060","category":"Dump Truck","type":"K24Y","fuelUsed":1429.7,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":10.881,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"CP 003","category":"Compactor","type":"6611E","fuelUsed":701,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.876,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"MH 004","category":"Manhaul","type":"MITSUBISHI CANTER","fuelUsed":675,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.037,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 070","category":"Dump Truck","type":"K60Y","fuelUsed":322,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":0.07,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"DT 050","category":"Dump Truck","type":"K24Y","fuelUsed":796.1,"production":0,"weightedDistance":0,"area":"-","fuelRatio":0,"fuelPerHM":19.754,"statusBasis":"CHECK DATA","diagnosis":"Fuel recorded but production is zero/missing"},{"unit":"MG 003","category":"Motor Grader","type":"CLG430D","fuelUsed":320,"production":0,"weightedDistance":0,"area":"BR 23","fuelRatio":null,"fuelPerHM":29.091,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"EX 003","category":"Excavator","type":"320GX","fuelUsed":313,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 003","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":452,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.172,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"MH 002","category":"Manhaul","type":"MITSUBISHI CANTER","fuelUsed":430,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.012,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 005","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":373,"production":0,"weightedDistance":0,"area":"BR 23","fuelRatio":null,"fuelPerHM":0.009,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"MH 001","category":"Manhaul","type":"MITSUBISHI CANTER","fuelUsed":354,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.012,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 090","category":"Dump Truck","type":"K51Y","fuelUsed":425,"production":1404.36,"weightedDistance":4.708,"area":"L31_14 - ESG","fuelRatio":0.06428,"fuelPerHM":24.011,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 005 km and fuel are proportional to production."},{"unit":"LV 016","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":319,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.153,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 006","category":"Light Vehicle","type":"TRITON 4X4","fuelUsed":344,"production":0,"weightedDistance":0,"area":"BR 23","fuelRatio":null,"fuelPerHM":0.01,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 088","category":"Dump Truck","type":"K51Y","fuelUsed":1280,"production":2887.75,"weightedDistance":5.848,"area":"L21_01 - ESG","fuelRatio":0.07579,"fuelPerHM":15.023,"statusBasis":"WITHIN LIMIT","diagnosis":"Within limit; Front-FPP distance 006 km and fuel are proportional to production."},{"unit":"LV 015","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":308,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.01,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"TH 001","category":"Other Heavy Equipment","type":"MTH4014-9","fuelUsed":241,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":5.684,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"DT 018","category":"Dump Truck","type":"K51Y","fuelUsed":339,"production":1531.74,"weightedDistance":2.264,"area":"L29_07 - ESG","fuelRatio":0.09776,"fuelPerHM":15.694,"statusBasis":"ABOVE LIMIT","diagnosis":"Ratio 0.000 exceeds limit 0.000 by 10%. Short-haul indication: Front-FPP distance 002 km; higher idle, acceleration, and low-speed share may increase L/Ton/KM. Validate idle time, payload, queue, and road condition."},{"unit":"MH 003","category":"Manhaul","type":"MITSUBISHI CANTER","fuelUsed":273,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.019,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"GS 002","category":"Genset","type":"V-GEN","fuelUsed":160,"production":0,"weightedDistance":0,"area":"WS","fuelRatio":null,"fuelPerHM":0,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"GS 001","category":"Genset","type":"V-GEN","fuelUsed":154,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":5.9,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 008","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":297,"production":0,"weightedDistance":0,"area":"L29","fuelRatio":null,"fuelPerHM":0.001,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 007","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":307,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.095,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"TL 001","category":"Trailer","type":"PRAMAC","fuelUsed":128,"production":0,"weightedDistance":0,"area":"BR 23","fuelRatio":null,"fuelPerHM":0.955,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 018","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":179,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.211,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 009","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":170,"production":0,"weightedDistance":0,"area":"L29","fuelRatio":null,"fuelPerHM":0.22,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 014","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":222,"production":0,"weightedDistance":0,"area":"LAYDOWN TII","fuelRatio":null,"fuelPerHM":0.045,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"TL 005","category":"Trailer","type":"PRAMAC","fuelUsed":147,"production":0,"weightedDistance":0,"area":"L 44","fuelRatio":null,"fuelPerHM":0.87,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"TL 004","category":"Trailer","type":"PRAMAC","fuelUsed":162,"production":0,"weightedDistance":0,"area":"BR 23 - L 29","fuelRatio":null,"fuelPerHM":1.227,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"TL 002","category":"Trailer","type":"PRAMAC","fuelUsed":69,"production":0,"weightedDistance":0,"area":"L 14","fuelRatio":null,"fuelPerHM":0,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"LV 004","category":"Light Vehicle","type":"HILUX 4X4","fuelUsed":64,"production":0,"weightedDistance":0,"area":"L29","fuelRatio":null,"fuelPerHM":0,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"TL 006","category":"Trailer","type":"PRAMAC","fuelUsed":30,"production":0,"weightedDistance":0,"area":"L 44","fuelRatio":null,"fuelPerHM":0,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"},{"unit":"TL 003","category":"Trailer","type":"PRAMAC","fuelUsed":100,"production":0,"weightedDistance":0,"area":"L 29","fuelRatio":null,"fuelPerHM":0.806,"statusBasis":"HM BASIS","diagnosis":"Evaluated using Fuel/HM, not L/Ton/KM"}];</script>
+<script>
+(function(){
+"use strict";
+
+const SYNC_URL = "https://script.google.com/macros/s/AKfycbx--kAngXn_AZkdUL5gNrjtuE14T8lFYxeGy1LUj20FT3XS9sU132crW4h4WZaHaYB2pw/exec";
+const MODULE_KEY = "fuel";
+const EDIT_CODE_HASH = "3f199b13"; // default: HAULING2026 (shared general edit code)
+const STORAGE_KEY = "portalFuel_v2";
+const EDIT_SESSION_KEY = STORAGE_KEY + "_edit";
+const NAME_KEY = "portalEditorName";
+
+function simpleHash(str){ let h=5381; for(let i=0;i<str.length;i++){ h=((h*33)^str.charCodeAt(i))>>>0; } return h.toString(16); }
+function syncEnabled(){ return !!SYNC_URL; }
+function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ============================================================
+   i18n
+   ============================================================ */
+let LANG = "id";
+try{ const l = localStorage.getItem("portalLang"); if(l) LANG = l; }catch(e){}
+const STR = {
+  id: {
+    sidebarHome: "Beranda", sidebarHauling: "Hauling Dashboard", sidebarRoster: "Roster Cuti",
+    sidebarDistance: "Distance Hauling", sidebarFuel: "Fuel Monitoring", sidebarPerformance: "Performance Operator",
+    sidebarCashflow: "Cashflow", sidebarRental: "Rental Unit",
+    subtitle: "PT. Teknologi Infrastruktur Indonesia — Konsumsi BBM vs Rencana",
+    backHome: "← Kembali ke Beranda",
+    btnHistory: "📜 Riwayat", btnAddDay: "+ Tambah/Ubah Tanggal", btnExport: "Export ▾",
+    exportPDF: "🖨 Export PDF (A4)", exportPNG: "🖼 Export PNG",
+    chartTitle: "Tren Fuel Ratio Harian: Aktual vs Rencana (L/ton/km)",
+    routeTableTitle: "Performa Fuel per Rute Hauling (Bulan Berjalan)",
+    unitTableTitle: "Konsumsi Fuel per Unit &amp; Kategori",
+    unitTableNote: "Catatan: Excavator, Genset, Fuel Truck, dan unit non-hauling lain tidak menghasilkan tonase, sehingga dievaluasi dengan Fuel/HM (jam mesin), bukan L/ton/km.",
+    dailyTableTitle: "Data Harian Fuel",
+    footerNote: "Fuel Monitoring · PT. Teknologi Infrastruktur Indonesia · data tersinkron otomatis dan tercatat riwayat perubahannya.",
+    unlockTitle: "Masukkan Kode Edit", yourName: "Nama Anda", yourNamePlaceholder: "Nama untuk dicatat di riwayat",
+    editCode: "Kode edit", cancel: "Batal", unlock: "Unlock", loginSuccess: "Berhasil masuk mode edit.", forceUnlock: "🔓 Buka Paksa (ambil alih kunci macet)",
+    dayModalTitle: "Tambah / Ubah Data Harian", date: "Tanggal", qtyFuel: "Qty Fuel (Liter)", qtyTonnage: "Qty Tonase (Ton)",
+    frPlan: "FR Plan (L/ton/km)", tonKm: "Ton-KM Harian (opsional)",
+    tonKmNote: "Ton-KM = jumlah (jarak × tonase) tiap rute hari itu. Kosongkan kalau tidak tahu — FR aktual hanya dihitung kalau nilai ini diisi.",
+    delete: "Hapus", save: "Simpan", historyTitle: "Riwayat Perubahan", close: "Tutup",
+    lockedView: "🔒 Mode Lihat", lockedEdit: "🔓 Mode Edit",
+    online: "🌐 Online", offline: "📴 Offline (data lokal terakhir)",
+    syncOffline: "Mode Lokal", syncSyncing: "Menyinkronkan…", syncSynced: "Tersinkron",
+    syncSyncedEmpty: "Tersambung — belum ada data", syncError: "Gagal tersambung ke server",
+    lockedByOther: "sedang diedit oleh {name}", wrongCode: "Kode salah.", nameRequired: "Nama wajib diisi.",
+    lockFailGeneric: "Gagal mengunci sesi.", relockToast: "Kunci edit berakhir/direbut oleh {name}. Silakan buka kunci lagi.",
+    historyEmpty: "Belum ada riwayat.", historyNeedsSync: "Riwayat hanya tersedia saat sinkronisasi aktif.",
+    historyWho: "Siapa", historyWhen: "Kapan", historyWhat: "Perubahan",
+    kpiMtdProduction: "Produksi MTD", kpiMtdFuel: "Fuel MTD", kpiWeightedDistance: "Jarak Terbobot (Weighted)",
+    kpiFuelRatio: "Fuel Ratio vs Limit", kpiActiveUnits: "Unit Aktif",
+    withinLimit: "SESUAI LIMIT", aboveLimit: "DI ATAS LIMIT",
+    colArea: "Area / Rute", colProduction: "Produksi (t)", colDistance: "Jarak (km)", colFuel: "Fuel (L)",
+    colFuelRatio: "Fuel Ratio", colLimit: "Limit", colStatus: "Status", colQueueHours: "Jam Antri",
+    colUnit: "Unit", colCategory: "Kategori", colType: "Tipe", colFuelUsed: "Fuel (L)",
+    colWeightedDist: "Jarak Terbobot (km)", colFuelPerHM: "Fuel/HM", colBasis: "Basis Evaluasi",
+    allCategories: "Semua",
+    colDate: "Tanggal", colQtyFuel: "Qty Fuel (L)", colQtyTonnage: "Qty Tonase (t)", colFRActual: "FR Aktual", colFRPlan: "FR Plan", colDiff: "Selisih",
+    noDailyData: "Belum ada data fuel harian. Klik Mode Edit lalu Tambah/Ubah Tanggal.",
+    linkedFromHauling: "Tonase disinkronkan otomatis dari Hauling Dashboard",
+    btnDieselPrice: "💲 Harga Solar", dieselPriceModalTitle: "Harga Solar Hari Ini",
+    dieselPriceModalNote: "Diisi manual karena harga solar dunia berubah tiap hari. Dipakai untuk menghitung estimasi kerugian/penghematan dari selisih Fuel Ratio.",
+    dieselPriceLabel: "Harga Solar (Rp per Liter)",
+    kpiFuelDeviationCost: "Estimasi Kerugian/Penghematan Fuel Ratio (MTD)",
+    fuelDeviationOver: "Boros (aktual di atas plan)", fuelDeviationUnder: "Hemat (aktual di bawah plan)",
+    fuelDeviationNoPrice: "Isi Harga Solar dulu untuk melihat estimasi ini.",
+    hmBasis: "Basis Fuel/HM (non-hauling)",
+    editOnly: "Fitur ini butuh koneksi internet.",
+    btnUploadExcel: "📤 Upload Excel", uploadPreviewTitle: "Pratinjau Data Excel", confirmUpload: "Gunakan Data Ini",
+    uploadNoSheet: "Sheet \"Executive Dashboard\" atau \"Fuel\" tidak ditemukan di file ini.",
+    uploadNoRows: "Tidak ada baris data yang terbaca. Pastikan formatnya sama seperti file Monitoring Payload asli.",
+    uploadFoundRows: "Ditemukan {n} hari data, {r} rute, dan {u} unit dari file Excel. Data lama akan digantikan setelah dikonfirmasi.",
+    uploadError: "Gagal membaca file Excel. Pastikan formatnya .xlsx yang valid.",
+    uploadSuccess: "Data fuel berhasil diperbarui dari file Excel.",
+  },
+  en: {
+    sidebarHome: "Home", sidebarHauling: "Hauling Dashboard", sidebarRoster: "Leave Roster",
+    sidebarDistance: "Distance Hauling", sidebarFuel: "Fuel Monitoring", sidebarPerformance: "Performance Operator",
+    sidebarCashflow: "Cashflow", sidebarRental: "Rental Unit",
+    subtitle: "PT. Teknologi Infrastruktur Indonesia — Fuel Consumption vs Plan",
+    backHome: "← Back to Home",
+    btnHistory: "📜 History", btnAddDay: "+ Add/Edit Date", btnExport: "Export ▾",
+    exportPDF: "🖨 Export PDF (A4)", exportPNG: "🖼 Export PNG",
+    chartTitle: "Daily Fuel Ratio Trend: Actual vs Plan (L/ton/km)",
+    routeTableTitle: "Fuel Performance by Hauling Route (Month to Date)",
+    unitTableTitle: "Fuel Consumption by Unit &amp; Category",
+    unitTableNote: "Note: Excavators, gensets, fuel trucks, and other non-hauling units don't produce tonnage, so they're evaluated by Fuel/HM (hour meter) instead of L/ton/km.",
+    dailyTableTitle: "Daily Fuel Data",
+    footerNote: "Fuel Monitoring · PT. Teknologi Infrastruktur Indonesia · data syncs automatically and every change is logged.",
+    unlockTitle: "Enter Edit Code", yourName: "Your name", yourNamePlaceholder: "Name shown in history log",
+    editCode: "Edit code", cancel: "Cancel", unlock: "Unlock", loginSuccess: "Successfully unlocked edit mode.", forceUnlock: "🔓 Force Unlock (take over stuck lock)",
+    dayModalTitle: "Add / Edit Daily Data", date: "Date", qtyFuel: "Qty Fuel (Liters)", qtyTonnage: "Qty Tonnage (t)",
+    frPlan: "FR Plan (L/ton/km)", tonKm: "Daily Ton-KM (optional)",
+    tonKmNote: "Ton-KM = sum of (distance × tonnage) across that day's routes. Leave blank if unknown — actual FR is only computed when this is filled in.",
+    delete: "Delete", save: "Save", historyTitle: "Change History", close: "Close",
+    lockedView: "🔒 View Mode", lockedEdit: "🔓 Edit Mode",
+    online: "🌐 Online", offline: "📴 Offline (last local data)",
+    syncOffline: "Local Mode", syncSyncing: "Syncing…", syncSynced: "Synced",
+    syncSyncedEmpty: "Connected — no data yet", syncError: "Couldn't reach server",
+    lockedByOther: "currently being edited by {name}", wrongCode: "Wrong code.", nameRequired: "Name is required.",
+    lockFailGeneric: "Failed to lock the session.", relockToast: "Your edit lock expired or was taken by {name}. Please unlock again.",
+    historyEmpty: "No history yet.", historyNeedsSync: "History is only available when sync is active.",
+    historyWho: "Who", historyWhen: "When", historyWhat: "Change",
+    kpiMtdProduction: "MTD Production", kpiMtdFuel: "MTD Fuel", kpiWeightedDistance: "Weighted Distance",
+    kpiFuelRatio: "Fuel Ratio vs Limit", kpiActiveUnits: "Active Units",
+    withinLimit: "WITHIN LIMIT", aboveLimit: "ABOVE LIMIT",
+    colArea: "Area / Route", colProduction: "Production (t)", colDistance: "Distance (km)", colFuel: "Fuel (L)",
+    colFuelRatio: "Fuel Ratio", colLimit: "Limit", colStatus: "Status", colQueueHours: "Queue Hours",
+    colUnit: "Unit", colCategory: "Category", colType: "Type", colFuelUsed: "Fuel (L)",
+    colWeightedDist: "Weighted Dist (km)", colFuelPerHM: "Fuel/HM", colBasis: "Evaluation Basis",
+    allCategories: "All",
+    colDate: "Date", colQtyFuel: "Qty Fuel (L)", colQtyTonnage: "Qty Tonnage (t)", colFRActual: "Actual FR", colFRPlan: "Plan FR", colDiff: "Diff",
+    noDailyData: "No daily fuel data yet. Click Edit Mode then Add/Edit Date.",
+    linkedFromHauling: "Tonnage synced automatically from Hauling Dashboard",
+    btnDieselPrice: "💲 Diesel Price", dieselPriceModalTitle: "Today's Diesel Price",
+    dieselPriceModalNote: "Entered manually since world diesel prices change daily. Used to estimate the cost impact of Fuel Ratio deviation.",
+    dieselPriceLabel: "Diesel Price (Rp per Liter)",
+    kpiFuelDeviationCost: "Est. Fuel Ratio Deviation Cost/Savings (MTD)",
+    fuelDeviationOver: "Over budget (actual above plan)", fuelDeviationUnder: "Savings (actual below plan)",
+    fuelDeviationNoPrice: "Enter the Diesel Price first to see this estimate.",
+    hmBasis: "Fuel/HM basis (non-hauling)",
+    editOnly: "This feature needs an internet connection.",
+    btnUploadExcel: "📤 Upload Excel", uploadPreviewTitle: "Excel Data Preview", confirmUpload: "Use This Data",
+    uploadNoSheet: "Sheet \"Executive Dashboard\" or \"Fuel\" was not found in this file.",
+    uploadNoRows: "No data rows could be read. Make sure the format matches the original Monitoring Payload file.",
+    uploadFoundRows: "Found {n} days, {r} routes, and {u} units in the Excel file. The old data will be replaced once confirmed.",
+    uploadError: "Failed to read the Excel file. Make sure it's a valid .xlsx file.",
+    uploadSuccess: "Fuel data updated successfully from Excel.",
+  }
+};
+function t(k){ return (STR[LANG]&&STR[LANG][k]) || k; }
+function applyStaticI18n(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{ el.innerHTML = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el=>{ el.placeholder = t(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll(".lang-toggle button").forEach(b=>{ b.classList.toggle("active", b.dataset.lang===LANG); });
+}
+function setLang(l){
+  LANG = l;
+  try{ localStorage.setItem("portalLang", l); }catch(e){}
+  applyStaticI18n();
+  applyLockUI();
+  renderAll();
+}
+function fmtNum(v,dec){ if(v===null||v===undefined||isNaN(v)) return "–"; dec=dec===undefined?0:dec; const loc=LANG==="en"?"en-US":"id-ID"; return Number(v).toLocaleString(loc,{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
+function fmtDateShort(iso){ if(!iso) return ""; const [y,m,d]=iso.split("-").map(Number); const months=LANG==="en"?["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]:["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"]; return `${d} ${months[m-1]}`; }
+
+/* ============================================================
+   Data
+   ============================================================ */
+let DATA = { days: (window.__FUEL_SEED__||[]).slice(), kpi: window.__FUEL_KPI__||{}, routes: window.__FUEL_ROUTES__||[], units: window.__FUEL_UNITS__||[], dieselPricePerLiter: null };
+let syncLockInfo=null, LAST_HISTORY=[], EDIT_UNLOCKED=false, editingDate=null, chart=null, currentCategory="all";
+
+async function syncFetchData(){
+  if(!syncEnabled()) return null;
+  try{ const res = await fetch(SYNC_URL+"?module="+MODULE_KEY+"&action=get",{method:"GET",cache:"no-store"}); if(!res.ok) throw new Error("HTTP "+res.status); return await res.json(); }
+  catch(e){ console.warn(e); return null; }
+}
+async function syncPost(action, extra){
+  if(!syncEnabled()) return { ok:false, message:"sync-disabled" };
+  try{
+    const res = await fetch(SYNC_URL, { method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify(Object.assign({ action, module:MODULE_KEY, editor:window.__editorName||"" }, extra||{})) });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    return await res.json();
+  }catch(e){ console.warn(e); return { ok:false, message:"network-error" }; }
+}
+function withTimeout(p,ms){ return Promise.race([p, new Promise(res=>setTimeout(()=>res(null),ms))]); }
+function isValidData(d){ return d && Array.isArray(d.days); }
+function cacheGet(){ try{ const r=localStorage.getItem(STORAGE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
+function cacheSet(d){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }catch(e){} }
+
+function setSyncStatus(status){
+  const el = document.getElementById("syncBadge");
+  if(!el) return;
+  if(!syncEnabled()){ el.style.display="none"; return; }
+  el.style.display = "";
+  const map = { syncing:{icon:"⏳",key:"syncSyncing"}, synced:{icon:"🟢",key:"syncSynced"},
+    "synced-empty":{icon:"🟡",key:"syncSyncedEmpty"}, error:{icon:"⚠️",key:"syncError"} };
+  const m = map[status]||map.error;
+  let extra = "";
+  if(syncLockInfo && syncLockInfo.holder && !EDIT_UNLOCKED) extra = " · " + t("lockedByOther").replace("{name}", syncLockInfo.holder);
+  el.textContent = m.icon+" "+t(m.key)+extra;
+}
+function renderOnlineBadge(){ const el=document.getElementById("onlineBadge"); if(el) el.textContent = navigator.onLine ? t("online") : t("offline"); }
+window.addEventListener("online", renderOnlineBadge);
+window.addEventListener("offline", renderOnlineBadge);
+
+async function loadData(){
+  const local = cacheGet() || DATA;
+  if(!syncEnabled()){ setSyncStatus("disabled"); return local; }
+  setSyncStatus("syncing");
+  const res = await withTimeout(syncFetchData(), 15000);
+  if(!res || !res.ok){ setSyncStatus("error"); return local; }
+  syncLockInfo = res.lock || null;
+  if(res.history) LAST_HISTORY = res.history;
+  if(isValidData(res.data)){ setSyncStatus("synced"); return res.data; }
+  setSyncStatus("synced-empty");
+  return local;
+}
+
+/* ============================================================
+   Cross-module link: Hauling daily tonnage -> Fuel "Qty Tonase"
+   ============================================================ */
+let LINKED_DATES = {};
+async function fetchHaulingDailyTotals(){
+  if(!syncEnabled()) return null;
+  try{
+    const res = await withTimeout(fetch(SYNC_URL+"?module=hauling&action=get",{method:"GET",cache:"no-store"}).then(r=>r.ok?r.json():null), 12000);
+    if(!res || !res.ok || !res.data) return null;
+    return res.data.dailyTotals || null;
+  }catch(e){ console.warn(e); return null; }
+}
+async function applyHaulingLink(){
+  const totals = await fetchHaulingDailyTotals();
+  if(!totals) return false;
+  let changed = false;
+  DATA.days.forEach(d=>{
+    const h = totals[d.date];
+    if(h && h.tons!==null && h.tons!==undefined){
+      const rounded = Math.round(h.tons*100)/100;
+      if(d.qtyTonnage !== rounded){ d.qtyTonnage = rounded; changed = true; }
+      LINKED_DATES[d.date] = true;
+    }
+  });
+  return changed;
+}
+function persist(context){
+  cacheSet(DATA);
+  if(syncEnabled() && EDIT_UNLOCKED){
+    setSyncStatus("syncing");
+    syncPost("save", { data: DATA, context: context||"" }).then(res=>{
+      if(res.ok){ setSyncStatus("synced"); if(res.history) LAST_HISTORY = res.history; }
+      else{ setSyncStatus("error"); if(res.message==="locked"){ syncLockInfo=res.lock; forceRelock(); } }
+    });
+  }
+}
+
+function forceRelock(){
+  EDIT_UNLOCKED=false;
+  try{ sessionStorage.removeItem(EDIT_SESSION_KEY); }catch(e){}
+  applyLockUI();
+  showToast(t("relockToast").replace("{name}", (syncLockInfo&&syncLockInfo.holder)||"?"));
+}
+function showToast(msg, type){
+  let bar=document.getElementById("toastBar");
+  if(!bar){ bar=document.createElement("div"); bar.id="toastBar"; document.body.appendChild(bar); }
+  const isSuccess = type === "success";
+  bar.style.cssText = isSuccess
+    ? "position:fixed;left:0;right:0;bottom:0;background:#1b3a2a;color:#c8ffd9;padding:10px 18px;font-size:12.5px;font-family:Inter,sans-serif;z-index:999;border-top:2px solid #2f8f58;"
+    : "position:fixed;left:0;right:0;bottom:0;background:#4a2b22;color:#ffd9c8;padding:10px 18px;font-size:12.5px;font-family:Inter,sans-serif;z-index:999;border-top:2px solid #c9463a;";
+  bar.textContent=(isSuccess?"✓ ":"⚠ ")+msg; bar.style.display="block";
+  setTimeout(()=>{ bar.style.display="none"; },6000);
+}
+function applyLockUI(){
+  document.body.classList.toggle("edit-locked", !EDIT_UNLOCKED);
+  const btn=document.getElementById("editLockToggle");
+  if(btn) btn.textContent = EDIT_UNLOCKED ? t("lockedEdit") : t("lockedView");
+}
+let heartbeatTimer=null;
+function startHeartbeat(){ stopHeartbeat(); heartbeatTimer=setInterval(async()=>{ const r=await syncPost("heartbeat",{}); if(!r.ok) forceRelock(); },45000); }
+function stopHeartbeat(){ if(heartbeatTimer){ clearInterval(heartbeatTimer); heartbeatTimer=null; } }
+
+function requireEdit(action){ if(EDIT_UNLOCKED){ action(); return; } openUnlockModal(action); }
+let PENDING_ACTION=null;
+function openUnlockModal(pending){
+  PENDING_ACTION=pending||null;
+  document.getElementById("unlockCodeInput").value="";
+  document.getElementById("unlockErr").style.display="none";
+  if(syncEnabled()){
+    document.getElementById("unlockNameRow").style.display="";
+    let saved=""; try{ saved=localStorage.getItem(NAME_KEY)||""; }catch(e){}
+    document.getElementById("unlockNameInput").value=saved;
+  } else { document.getElementById("unlockNameRow").style.display="none"; }
+  document.getElementById("unlockModal").classList.add("open");
+}
+async function confirmUnlock(){
+  const code=document.getElementById("unlockCodeInput").value;
+  const err=document.getElementById("unlockErr");
+  if(simpleHash(code)!==EDIT_CODE_HASH){ err.textContent=t("wrongCode"); err.style.display="block"; return; }
+  let editorName="";
+  if(syncEnabled()){
+    editorName=document.getElementById("unlockNameInput").value.trim();
+    if(!editorName){ err.textContent=t("nameRequired"); err.style.display="block"; return; }
+    try{ localStorage.setItem(NAME_KEY, editorName); }catch(e){}
+    window.__editorName=editorName;
+    const btn=document.getElementById("confirmUnlockBtn"); btn.disabled=true;
+    const res=await syncPost("acquireLock",{});
+    btn.disabled=false;
+    if(!res.ok){ syncLockInfo=res.lock||null; err.textContent=res.lock?t("lockedByOther").replace("{name}",res.lock.holder):t("lockFailGeneric"); err.style.display="block"; if(res.lock) document.getElementById("forceUnlockBtn").style.display="block"; return; }
+    syncLockInfo=res.lock||null;
+    startHeartbeat();
+  }
+  finishUnlock();
+}
+async function forceUnlockConfirm(){
+  const err=document.getElementById("unlockErr");
+  const forceBtn=document.getElementById("forceUnlockBtn");
+  forceBtn.disabled=true;
+  const res=await syncPost("forceUnlock",{});
+  forceBtn.disabled=false;
+  if(!res.ok){ err.textContent=t("lockFailGeneric"); err.style.display="block"; return; }
+  syncLockInfo=res.lock||null;
+  startHeartbeat();
+  forceBtn.style.display="none";
+  finishUnlock();
+}
+function finishUnlock(){
+  EDIT_UNLOCKED=true;
+  try{ sessionStorage.setItem(EDIT_SESSION_KEY,"1"); }catch(e){}
+  applyLockUI();
+  document.getElementById("unlockModal").classList.remove("open");
+  showToast(t("loginSuccess"), "success");
+  const a=PENDING_ACTION; PENDING_ACTION=null; if(a) a();
+}
+function toggleEditLock(){
+  if(EDIT_UNLOCKED){
+    EDIT_UNLOCKED=false;
+    try{ sessionStorage.removeItem(EDIT_SESSION_KEY); }catch(e){}
+    applyLockUI(); stopHeartbeat();
+    if(syncEnabled()) syncPost("releaseLock",{});
+  } else { openUnlockModal(null); }
+}
+
+/* ---------------- Calculations ---------------- */
+function actualFR(d){ return (d.qtyFuel!==null && d.tonKm) ? d.qtyFuel/d.tonKm : null; }
+function sortedDays(){ return DATA.days.slice().sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:0); }
+
+/* ---------------- KPI ---------------- */
+function renderKPI(){
+  const grid = document.getElementById("kpiGrid");
+  const k = DATA.kpi || {};
+  const over = k.fuelRatioLimit && (k.mtdFuel/(k.mtdProduction*k.weightedDistance)) > k.fuelRatioLimit;
+  const overallFR = (k.mtdProduction && k.weightedDistance) ? k.mtdFuel/(k.mtdProduction*k.weightedDistance) : null;
+  const dieselPrice = DATA.dieselPricePerLiter;
+  let deviationCard = "";
+  if(overallFR!==null && k.fuelRatioLimit && k.mtdProduction && k.weightedDistance){
+    if(dieselPrice && dieselPrice>0){
+      const deviationCost = (overallFR - k.fuelRatioLimit) * k.mtdProduction * k.weightedDistance * dieselPrice;
+      const isOver = deviationCost > 0;
+      deviationCard = `<div class="kpi-card ${isOver?'accent-red':'accent-green'}"><div class="kpi-label">${t("kpiFuelDeviationCost")}</div><div class="kpi-value" style="font-size:20px;">${fmtRp(Math.abs(deviationCost))}</div><div class="kpi-sub">${isOver?t("fuelDeviationOver"):t("fuelDeviationUnder")}</div></div>`;
+    } else {
+      deviationCard = `<div class="kpi-card"><div class="kpi-label">${t("kpiFuelDeviationCost")}</div><div class="kpi-value" style="font-size:13px; color:var(--text-faint);">${t("fuelDeviationNoPrice")}</div></div>`;
+    }
+  }
+  grid.innerHTML = `
+    <div class="kpi-card accent-teal"><div class="kpi-label">${t("kpiMtdProduction")}</div><div class="kpi-value">${fmtNum(k.mtdProduction)}<span class="unit">t</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">${t("kpiMtdFuel")}</div><div class="kpi-value">${fmtNum(k.mtdFuel)}<span class="unit">L</span></div></div>
+    <div class="kpi-card"><div class="kpi-label">${t("kpiWeightedDistance")}</div><div class="kpi-value">${fmtNum(k.weightedDistance,2)}<span class="unit">km</span></div></div>
+    <div class="kpi-card ${over?'accent-red':'accent-green'}"><div class="kpi-label">${t("kpiFuelRatio")}</div><div class="kpi-value">${fmtNum(overallFR,4)}<span class="unit">L/t/km</span></div><div class="kpi-sub">${over?t("aboveLimit"):t("withinLimit")} · Limit ${fmtNum(k.fuelRatioLimit,3)}</div></div>
+    ${deviationCard}
+  `;
+}
+function fmtRp(v){ if(v===null||v===undefined||isNaN(v)) return "–"; return "Rp"+Math.round(v).toLocaleString("id-ID"); }
+function openDieselPriceModal(){
+  document.getElementById("dieselPriceInput").value = DATA.dieselPricePerLiter || "";
+  document.getElementById("dieselPriceModal").classList.add("open");
+}
+function saveDieselPrice(){
+  if(!EDIT_UNLOCKED) return;
+  const v = parseFloat(document.getElementById("dieselPriceInput").value);
+  DATA.dieselPricePerLiter = (isNaN(v) || v<=0) ? null : v;
+  persist("Update harga solar: "+(DATA.dieselPricePerLiter?fmtRp(DATA.dieselPricePerLiter)+"/L":"-"));
+  document.getElementById("dieselPriceModal").classList.remove("open");
+  renderAll();
+  showToast(t("uploadSuccess"), "success");
+}
+
+/* ---------------- Chart ---------------- */
+function ensureChartDefaults(){
+  if(typeof Chart==="undefined") return false;
+  Chart.defaults.color = "#4c5b76";
+  Chart.defaults.borderColor = "#ccd6e4";
+  if(Chart.defaults.font) Chart.defaults.font.family = "Inter";
+  return true;
+}
+function renderChart(){
+  const canvas = document.getElementById("chartFR");
+  if(chart){ chart.destroy(); chart=null; }
+  const existingFallback = document.getElementById("chartFallback");
+  if(existingFallback) existingFallback.remove();
+  canvas.style.display = "";
+  if(!ensureChartDefaults()){
+    canvas.closest(".panel").querySelector("h3").insertAdjacentHTML("afterend", `<div class="empty-note" id="chartFallback">${t("editOnly")}</div>`);
+    canvas.style.display = "none";
+    return;
+  }
+  const days = sortedDays().filter(d=>d.qtyFuel!==null && d.tonKm);
+  const labels = days.map(d=>fmtDateShort(d.date));
+  chart = new Chart(canvas, {
+    type: "line",
+    data: { labels, datasets: [
+      { label:LANG==="en"?"Actual FR":"FR Aktual", data: days.map(d=>actualFR(d)), borderColor:"#1d5fbf", backgroundColor:"rgba(29,95,191,0.10)", fill:true, tension:0.3, pointRadius:2 },
+      { label:LANG==="en"?"Plan FR":"FR Plan", data: days.map(d=>d.frPlan), borderColor:"#e8a90d", backgroundColor:"transparent", borderDash:[6,3], tension:0.3, pointRadius:2 },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ boxWidth:10, boxHeight:10, usePointStyle:true } } },
+      scales:{ x:{ grid:{ color:"rgba(19,33,59,0.06)" } }, y:{ grid:{ color:"rgba(19,33,59,0.08)" } } }
+    }
+  });
+}
+
+/* ---------------- Route table ---------------- */
+function renderRouteTable(){
+  const wrap = document.getElementById("routeTableWrap");
+  const routes = DATA.routes||[];
+  if(!routes.length){ wrap.innerHTML = ""; return; }
+  let head = `<tr><th class="rowlabel">${t("colArea")}</th><th>${t("colProduction")}</th><th>${t("colDistance")}</th><th>${t("colFuel")}</th><th>${t("colFuelRatio")}</th><th>${t("colLimit")}</th><th>${t("colStatus")}</th><th>${t("colQueueHours")}</th></tr>`;
+  let body = routes.map(r=>{
+    const isTotal = r.area === "ALL LOCATIONS";
+    const statusKey = r.status === "WITHIN LIMIT" ? "withinLimit" : "aboveLimit";
+    const statusCls = r.status === "WITHIN LIMIT" ? "status-within" : "status-above";
+    return `<tr style="${isTotal?'font-weight:700; border-top:2px solid var(--border);':''}">
+      <td class="rowlabel">${escapeHtml(r.area)}</td>
+      <td>${fmtNum(r.production)}</td>
+      <td>${fmtNum(r.distanceKm,2)}</td>
+      <td>${fmtNum(r.allocatedFuel)}</td>
+      <td>${fmtNum(r.fuelRatio,4)}</td>
+      <td>${fmtNum(r.limit,3)}</td>
+      <td class="${statusCls}">${t(statusKey)}</td>
+      <td>${fmtNum(r.queueHours)}</td>
+    </tr>`;
+  }).join("");
+  wrap.innerHTML = `<table class="data-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+/* ---------------- Unit category table ---------------- */
+function renderCatTabs(){
+  const cats = Array.from(new Set((DATA.units||[]).map(u=>u.category))).sort();
+  const wrap = document.getElementById("catTabs");
+  wrap.innerHTML = [`<button class="cat-tab ${currentCategory==='all'?'active':''}" data-cat="all">${t("allCategories")}</button>`]
+    .concat(cats.map(c=>`<button class="cat-tab ${currentCategory===c?'active':''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`)).join("");
+  wrap.querySelectorAll(".cat-tab").forEach(btn=>{
+    btn.onclick = ()=>{ currentCategory = btn.dataset.cat; renderCatTabs(); renderUnitTable(); };
+  });
+}
+function renderUnitTable(){
+  const wrap = document.getElementById("unitTableWrap");
+  const units = (DATA.units||[]).filter(u => currentCategory==="all" || u.category===currentCategory);
+  if(!units.length){ wrap.innerHTML = ""; return; }
+  let head = `<tr><th class="rowlabel">${t("colUnit")}</th><th class="rowlabel">${t("colCategory")}</th><th>${t("colType")}</th><th>${t("colFuelUsed")}</th><th>${t("colProduction")}</th><th>${t("colWeightedDist")}</th><th>${t("colFuelRatio")}</th><th>${t("colFuelPerHM")}</th><th>${t("colBasis")}</th></tr>`;
+  let body = units.map(u=>{
+    const isHM = u.statusBasis === "HM BASIS";
+    const statusCls = isHM ? "" : (u.statusBasis==="WITHIN LIMIT" ? "status-within" : "status-above");
+    const basisLabel = isHM ? t("hmBasis") : (u.statusBasis==="WITHIN LIMIT" ? t("withinLimit") : t("aboveLimit"));
+    return `<tr>
+      <td class="rowlabel">${escapeHtml(u.unit)}</td>
+      <td class="rowlabel">${escapeHtml(u.category)}</td>
+      <td>${escapeHtml(u.type||"")}</td>
+      <td>${fmtNum(u.fuelUsed)}</td>
+      <td>${u.production?fmtNum(u.production):"–"}</td>
+      <td>${u.weightedDistance?fmtNum(u.weightedDistance,2):"–"}</td>
+      <td>${u.fuelRatio!==null&&u.fuelRatio!==undefined?fmtNum(u.fuelRatio,4):"–"}</td>
+      <td>${u.fuelPerHM?fmtNum(u.fuelPerHM,2):"–"}</td>
+      <td class="${statusCls}">${basisLabel}</td>
+    </tr>`;
+  }).join("");
+  wrap.innerHTML = `<table class="data-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+/* ---------------- Daily table ---------------- */
+function renderTable(){
+  const wrap = document.getElementById("fuelTableWrap");
+  const days = sortedDays();
+  if(!days.length){
+    wrap.innerHTML = `<div class="no-data-note"><div class="big-icon">⛽</div><h3>${t("noDailyData")}</h3></div>`;
+    return;
+  }
+  let head = `<tr><th class="rowlabel">${t("colDate")}</th><th>${t("colQtyFuel")}</th><th>${t("colQtyTonnage")}</th><th>Ton-KM</th><th>${t("colFRActual")}</th><th>${t("colFRPlan")}</th><th>${t("colDiff")}</th><th></th></tr>`;
+  let body = days.map(d=>{
+    const fr = actualFR(d);
+    const diff = (fr!==null && d.frPlan) ? ((fr-d.frPlan)/d.frPlan*100) : null;
+    const diffColor = diff===null ? "" : diff>0 ? "color:var(--red);" : "color:var(--green);";
+    return `<tr>
+      <td class="rowlabel">${fmtDateShort(d.date)} ${d.date.slice(0,4)}</td>
+      <td>${fmtNum(d.qtyFuel)}</td>
+      <td>${fmtNum(d.qtyTonnage)}${LINKED_DATES[d.date]?` <span title="${t('linkedFromHauling')}" style="color:var(--teal); font-size:11px;">🔗</span>`:""}</td>
+      <td>${d.tonKm?fmtNum(d.tonKm):"–"}</td>
+      <td>${fmtNum(fr,4)}</td>
+      <td>${fmtNum(d.frPlan,4)}</td>
+      <td style="${diffColor}">${diff!==null?(diff>0?"+":"")+fmtNum(diff,1)+"%":"–"}</td>
+      <td><button class="btn edit-day-btn edit-only" data-date="${d.date}" style="padding:4px 10px; font-size:11px;">✎</button></td>
+    </tr>`;
+  }).join("");
+  wrap.innerHTML = `<table class="data-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  wrap.querySelectorAll(".edit-day-btn").forEach(btn=>{
+    btn.onclick = ()=>requireEdit(()=>openDayModal(btn.dataset.date));
+  });
+}
+function renderAll(){ renderKPI(); renderChart(); renderRouteTable(); renderCatTabs(); renderUnitTable(); renderTable(); }
+
+/* ---------------- Add/edit day modal ---------------- */
+function openDayModal(dateISO){
+  editingDate = dateISO || null;
+  const d = editingDate ? DATA.days.find(x=>x.date===editingDate) : { date:"", qtyFuel:null, qtyTonnage:null, tonKm:null, frPlan: DATA.kpi.fuelRatioLimit||0.089 };
+  document.getElementById("dayModalTitle").textContent = editingDate ? t("dayModalTitle") : t("dayModalTitle");
+  document.getElementById("fDate").value = d.date||"";
+  document.getElementById("fQtyFuel").value = d.qtyFuel ?? "";
+  document.getElementById("fQtyTonnage").value = d.qtyTonnage ?? "";
+  document.getElementById("fFRPlan").value = d.frPlan ?? "";
+  document.getElementById("fTonKm").value = d.tonKm ?? "";
+  document.getElementById("deleteDayBtn").style.display = editingDate ? "" : "none";
+  document.getElementById("dayModal").classList.add("open");
+}
+function numOrNull(v){ return v===""||v===null||v===undefined ? null : parseFloat(v); }
+function saveDay(){
+  if(!EDIT_UNLOCKED) return;
+  const date = document.getElementById("fDate").value;
+  if(!date){ alert(t("date")+"?"); return; }
+  const entry = {
+    date,
+    qtyFuel: numOrNull(document.getElementById("fQtyFuel").value),
+    qtyTonnage: numOrNull(document.getElementById("fQtyTonnage").value),
+    frPlan: numOrNull(document.getElementById("fFRPlan").value),
+    tonKm: numOrNull(document.getElementById("fTonKm").value),
+  };
+  const existingIdx = DATA.days.findIndex(d=>d.date===date);
+  let context;
+  if(existingIdx>=0){ DATA.days[existingIdx] = entry; context = "Update fuel data: "+date; }
+  else{ DATA.days.push(entry); context = "Add fuel data: "+date; }
+  persist(context);
+  document.getElementById("dayModal").classList.remove("open");
+  renderAll();
+}
+function deleteDay(){
+  if(!EDIT_UNLOCKED || !editingDate) return;
+  if(!confirm((LANG==="en"?"Delete fuel data for ":"Hapus data fuel tanggal ")+editingDate+"?")) return;
+  DATA.days = DATA.days.filter(d=>d.date!==editingDate);
+  persist("Delete fuel data: "+editingDate);
+  document.getElementById("dayModal").classList.remove("open");
+  renderAll();
+}
+
+/* ---------------- History ---------------- */
+function formatHistoryTime(iso){ try{ return new Date(iso).toLocaleString(LANG==="en"?"en-US":"id-ID",{dateStyle:"medium",timeStyle:"short"}); }catch(e){ return iso; } }
+function renderHistoryBody(){
+  const body = document.getElementById("historyBody");
+  if(!syncEnabled()){ body.innerHTML = `<div class="empty-note">${t("historyNeedsSync")}</div>`; return; }
+  if(!LAST_HISTORY.length){ body.innerHTML = `<div class="empty-note">${t("historyEmpty")}</div>`; return; }
+  let rows = `<tr><th class="rowlabel">${t("historyWho")}</th><th class="rowlabel">${t("historyWhen")}</th><th class="rowlabel">${t("historyWhat")}</th></tr>`;
+  LAST_HISTORY.forEach(h=>{ rows += `<tr><td class="rowlabel">${escapeHtml(h.editor||"–")}</td><td class="rowlabel" style="white-space:nowrap;">${formatHistoryTime(h.timestamp)}</td><td class="rowlabel">${escapeHtml(h.context||"–")}</td></tr>`; });
+  body.innerHTML = `<div class="table-scroll open" style="max-height:420px;"><table class="data-table">${rows}</table></div>`;
+}
+async function openHistoryModal(){
+  document.getElementById("historyModal").classList.add("open");
+  renderHistoryBody();
+  if(!syncEnabled()) return;
+  const res = await syncFetchData();
+  if(res && res.ok && res.history){ LAST_HISTORY = res.history; renderHistoryBody(); }
+}
+
+/* ---------------- Export ---------------- */
+/* ============================================================
+   Excel Upload/Import
+   ============================================================ */
+let PENDING_IMPORT = null;
+function excelDateToISO(v){
+  if(v instanceof Date && !isNaN(v)){
+    const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,"0"), d=String(v.getDate()).padStart(2,"0");
+    return `${y}-${m}-${d}`;
+  }
+  if(typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10);
+  return null;
+}
+function num(v){
+  if(typeof v === "number") return v;
+  if(typeof v === "string"){
+    const trimmed = v.trim();
+    if(trimmed.startsWith("#")) return null; // Excel error values: #DIV/0!, #N/A, #VALUE!, #REF!, etc.
+    const cleaned = trimmed.replace(/[^0-9.\-]/g, "");
+    if(cleaned !== "" && !isNaN(cleaned)) return parseFloat(cleaned);
+  }
+  return null;
+}
+function cellVal(ws, addr){
+  const cell = ws[addr];
+  if(!cell || cell.v===undefined) return null;
+  return cell.v;
+}
+function sheetMaxRow(ws){
+  if(ws["!ref"]){ const range = XLSX.utils.decode_range(ws["!ref"]); return range.e.r + 1; }
+  return 300;
+}
+function parseFuelWorkbook(workbook){
+  const execName = workbook.SheetNames.find(n => n.toLowerCase().includes("executive dashboard"));
+  const fuelName = workbook.SheetNames.find(n => n.trim().toLowerCase() === "fuel");
+  if(!execName && !fuelName) return { error: "uploadNoSheet" };
+
+  let kpi = {}, routes = [], units = [];
+  if(execName){
+    const ws = workbook.Sheets[execName];
+    kpi = {
+      mtdProduction: num(cellVal(ws,"A7")),
+      mtdFuel: num(cellVal(ws,"F7")),
+      weightedDistance: num(cellVal(ws,"K7")),
+      fuelRatioLimit: num(cellVal(ws,"M4")),
+    };
+    // KEY ROUTE PERFORMANCE: rows 55-61, columns A-H
+    for(let r=55; r<=61; r++){
+      const area = cellVal(ws,"A"+r); if(!area) continue;
+      routes.push({ area, production:num(cellVal(ws,"B"+r)), distanceKm:num(cellVal(ws,"C"+r)), allocatedFuel:num(cellVal(ws,"D"+r)), fuelRatio:num(cellVal(ws,"E"+r)), limit:num(cellVal(ws,"F"+r)), status:cellVal(ws,"G"+r), queueHours:num(cellVal(ws,"H"+r)) });
+    }
+    // ALL UNIT FUEL PERFORMANCE: rows 65-193, columns A-L
+    for(let r=65; r<=193; r++){
+      const unit = cellVal(ws,"A"+r), category = cellVal(ws,"B"+r);
+      if(!unit || typeof category !== "string" || unit==="Category") continue;
+      units.push({ unit, category, type:cellVal(ws,"C"+r), fuelUsed:num(cellVal(ws,"D"+r)), production:num(cellVal(ws,"E"+r)), weightedDistance:num(cellVal(ws,"F"+r)), area:cellVal(ws,"G"+r), fuelRatio:num(cellVal(ws,"H"+r)), fuelPerHM:num(cellVal(ws,"I"+r)), statusBasis:cellVal(ws,"K"+r), diagnosis:cellVal(ws,"L"+r) });
+    }
+  }
+
+  let days = [];
+  if(fuelName){
+    const ws = workbook.Sheets[fuelName];
+    const maxRow = sheetMaxRow(ws);
+    const dayMap = {};
+    // Daily summary table: columns P-S = Date, QtyFuel, QtyTonnage, FRPlan.
+    for(let r=1; r<=maxRow; r++){
+      const d = excelDateToISO(cellVal(ws,"P"+r));
+      const qtyFuel = num(cellVal(ws,"Q"+r)), qtyTonnage = num(cellVal(ws,"R"+r));
+      if(d && (qtyFuel!==null || qtyTonnage!==null)){
+        dayMap[d] = { date:d, qtyFuel, qtyTonnage, frPlan:num(cellVal(ws,"S"+r)), tonKm:0 };
+      }
+    }
+    // Per-shift table: columns B=Date, J=DistanceKm, L=Tonnage -> sum(distance*tonnage) per day = ton-km
+    for(let r=1; r<=maxRow; r++){
+      const d = excelDateToISO(cellVal(ws,"B"+r));
+      const distKm = num(cellVal(ws,"J"+r)), tonnage = num(cellVal(ws,"L"+r));
+      if(d && distKm!==null && tonnage!==null){
+        if(!dayMap[d]) dayMap[d] = { date:d, qtyFuel:null, qtyTonnage:null, frPlan:null, tonKm:0 };
+        dayMap[d].tonKm = Math.round((dayMap[d].tonKm + distKm*tonnage)*10)/10;
+      }
+    }
+    days = Object.values(dayMap).sort((a,b)=> a.date<b.date?-1:1);
+  }
+
+  if(!routes.length && !units.length && !days.length) return { error: "uploadNoRows" };
+  return { kpi, routes, units, days };
+}
+function openUploadPreview(result){
+  const body = document.getElementById("uploadPreviewBody");
+  if(result.error){
+    body.innerHTML = `<div class="empty-note">${t(result.error)}</div>`;
+    document.getElementById("confirmUploadBtn").style.display = "none";
+  } else {
+    document.getElementById("confirmUploadBtn").style.display = "";
+    body.innerHTML = `<p>${t("uploadFoundRows").replace("{n}",result.days.length).replace("{r}",result.routes.length).replace("{u}",result.units.length)}</p>`;
+  }
+  PENDING_IMPORT = result.error ? null : result;
+  document.getElementById("uploadPreviewModal").classList.add("open");
+}
+function handleExcelFile(file){
+  if(!file) return;
+  const run = () => {
+    if(typeof XLSX === "undefined"){ alert(t("uploadError")); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try{
+        const workbook = XLSX.read(new Uint8Array(e.target.result), { type:"array", cellDates:true });
+        openUploadPreview(parseFuelWorkbook(workbook));
+      }catch(err){ console.error(err); alert(t("uploadError")); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  if(typeof XLSX === "undefined" && window.__xlsxReady){ window.__xlsxReady.then(run); } else { run(); }
+}
+function confirmUploadImport(){
+  if(!PENDING_IMPORT || !EDIT_UNLOCKED) return;
+  if(PENDING_IMPORT.kpi && Object.keys(PENDING_IMPORT.kpi).length) DATA.kpi = PENDING_IMPORT.kpi;
+  if(PENDING_IMPORT.routes && PENDING_IMPORT.routes.length) DATA.routes = PENDING_IMPORT.routes;
+  if(PENDING_IMPORT.units && PENDING_IMPORT.units.length) DATA.units = PENDING_IMPORT.units;
+  if(PENDING_IMPORT.days && PENDING_IMPORT.days.length) DATA.days = PENDING_IMPORT.days;
+  persist("Update fuel dari upload Excel");
+  document.getElementById("uploadPreviewModal").classList.remove("open");
+  renderAll();
+  if(window.__chartReady){ window.__chartReady.then(loaded=>{ if(loaded) renderChart(); }); }
+  showToast(t("uploadSuccess"), "success");
+  PENDING_IMPORT = null;
+}
+
+/* ============================================================
+   Export
+   ============================================================ */
+function exportPDF(){ window.print(); }
+function exportPNG(){
+  const run = ()=>{
+    if(typeof html2canvas === "undefined"){ alert(t("editOnly")); return; }
+    html2canvas(document.getElementById("app"), { backgroundColor:"#f4f6fa", scale:2,
+      ignoreElements: el=> el.classList && (el.classList.contains("controls-bar") || el.classList.contains("footer-note")) })
+      .then(canvas=>{ const link=document.createElement("a"); link.download="fuel-monitoring-"+Date.now()+".png"; link.href=canvas.toDataURL("image/png"); link.click(); });
+  };
+  if(typeof html2canvas === "undefined" && window.__h2cReady){ window.__h2cReady.then(run); } else { run(); }
+}
+
+/* ---------------- Init ---------------- */
+function tickClock(){ document.getElementById("liveClock").textContent = new Date().toLocaleString(LANG==="en"?"en-US":"id-ID",{weekday:"short",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
+function boot(){
+  renderAll();
+  if(window.__chartReady){ window.__chartReady.then(loaded=>{ if(loaded) renderChart(); }); }
+  loadData().then(async d=>{
+    DATA = d;
+    renderAll();
+    const linked = await applyHaulingLink();
+    if(linked){
+      renderAll();
+      if(EDIT_UNLOCKED) persist("Sinkron tonase harian dari Hauling");
+    }
+  });
+}
+function wireUI(){
+  renderOnlineBadge();
+  tickClock(); setInterval(tickClock,1000);
+  applyStaticI18n();
+  addPasswordToggles();
+
+  document.querySelectorAll(".lang-toggle button").forEach(b=>{ b.onclick = ()=>setLang(b.dataset.lang); });
+
+  document.getElementById("editLockToggle").onclick = toggleEditLock;
+  document.getElementById("cancelUnlockBtn").onclick = ()=>document.getElementById("unlockModal").classList.remove("open");
+  document.getElementById("unlockModalClose").onclick = ()=>document.getElementById("unlockModal").classList.remove("open");
+  document.getElementById("confirmUnlockBtn").onclick = confirmUnlock;
+  document.getElementById("forceUnlockBtn").onclick = forceUnlockConfirm;
+  document.getElementById("unlockCodeInput").addEventListener("keydown", e=>{ if(e.key==="Enter") confirmUnlock(); });
+
+  document.getElementById("btnAddDay").onclick = ()=>requireEdit(()=>openDayModal(null));
+  document.getElementById("btnUploadExcel").onclick = ()=>requireEdit(()=>document.getElementById("excelFileInput").click());
+  document.getElementById("btnDieselPrice").onclick = ()=>requireEdit(openDieselPriceModal);
+  document.getElementById("cancelDieselPriceBtn").onclick = ()=>document.getElementById("dieselPriceModal").classList.remove("open");
+  document.getElementById("dieselPriceModalClose").onclick = ()=>document.getElementById("dieselPriceModal").classList.remove("open");
+  document.getElementById("saveDieselPriceBtn").onclick = saveDieselPrice;
+  document.getElementById("excelFileInput").addEventListener("change", (e)=>{
+    handleExcelFile(e.target.files[0]); e.target.value = "";
+  });
+  document.getElementById("cancelUploadBtn").onclick = ()=>document.getElementById("uploadPreviewModal").classList.remove("open");
+  document.getElementById("uploadPreviewModalClose").onclick = ()=>document.getElementById("uploadPreviewModal").classList.remove("open");
+  document.getElementById("confirmUploadBtn").onclick = confirmUploadImport;
+  document.getElementById("cancelDayBtn").onclick = ()=>document.getElementById("dayModal").classList.remove("open");
+  document.getElementById("dayModalClose").onclick = ()=>document.getElementById("dayModal").classList.remove("open");
+  document.getElementById("saveDayBtn").onclick = saveDay;
+  document.getElementById("deleteDayBtn").onclick = deleteDay;
+
+  document.getElementById("btnHistory").onclick = openHistoryModal;
+  document.getElementById("historyModalClose").onclick = ()=>document.getElementById("historyModal").classList.remove("open");
+  document.getElementById("closeHistoryBtn").onclick = ()=>document.getElementById("historyModal").classList.remove("open");
+
+  document.getElementById("btnExportMenu").onclick = ()=>document.getElementById("exportMenu").classList.toggle("open");
+  document.addEventListener("click", e=>{ if(!e.target.closest(".actions")) document.getElementById("exportMenu").classList.remove("open"); });
+  document.querySelectorAll("[data-export]").forEach(b=>{
+    b.onclick = ()=>{ document.getElementById("exportMenu").classList.remove("open");
+      if(b.dataset.export==="pdf") exportPDF(); if(b.dataset.export==="png") exportPNG(); };
+  });
+
+  window.addEventListener("beforeunload", ()=>{
+    if(EDIT_UNLOCKED && syncEnabled() && window.__editorName){
+      try{ navigator.sendBeacon(SYNC_URL, new Blob([JSON.stringify({action:"releaseLock", module:MODULE_KEY, editor:window.__editorName})], {type:"text/plain;charset=utf-8"})); }catch(e){}
+    }
+  });
+}
+document.addEventListener("DOMContentLoaded", ()=>{
+  try{ window.__editorName = localStorage.getItem(NAME_KEY)||""; }catch(e){}
+  try{ EDIT_UNLOCKED = sessionStorage.getItem(EDIT_SESSION_KEY)==="1"; }catch(e){}
+  wireUI();
+  applyLockUI();
+  boot();
+});
+})();
+
+/* ============================================================
+   Password show/hide toggle — auto-applied to every password
+   field on the page (edit code, view code, detail code, etc.)
+   ============================================================ */
+function addPasswordToggles(){
+  document.querySelectorAll('input[type="password"]').forEach(input=>{
+    if(input.dataset.toggleAdded) return;
+    input.dataset.toggleAdded = "1";
+    const wrap = document.createElement("span");
+    wrap.style.cssText = "position:relative; display:block; width:100%;";
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    const existingPad = getComputedStyle(input).paddingRight;
+    input.style.paddingRight = "36px";
+    input.style.width = "100%";
+    input.style.boxSizing = "border-box";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "👁";
+    btn.setAttribute("aria-label", "Show/hide password");
+    btn.style.cssText = "position:absolute; right:4px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:14px; padding:4px 6px; line-height:1; color:var(--text-dim, #666);";
+    btn.onclick = (e)=>{
+      e.preventDefault();
+      input.type = input.type === "password" ? "text" : "password";
+      btn.textContent = input.type === "password" ? "👁" : "🙈";
+    };
+    wrap.appendChild(btn);
+  });
+}
+
+</script>
+
+</body>
+</html>
