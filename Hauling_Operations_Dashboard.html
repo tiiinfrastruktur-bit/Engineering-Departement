@@ -1691,7 +1691,8 @@ function siteKPIs(site, iso, mode){
   const pa = rangeAvg(paRow);
   const ua = rangeAvg(uaRow);
   const cycleTime = rangeAvg(cycleTimeRow);
-  const tonnageAvg = rangeAvg(tonnageAvgRow);
+  let tonnageAvg = rangeAvg(tonnageAvgRow);
+  if(tonnageAvg===null && tons!==null && cycles){ tonnageAvg = tons/cycles; }
   const driver = mode==="mtd" ? avgRangeISO(driverRow,startIso,endIso) : sumDN(driverRow,iso);
   const rfu = mode==="mtd" ? avgRangeISO(rfuRow,startIso,endIso) : avgDN(rfuRow,iso);
   const breakdown = rangeSum(breakdownRow);
@@ -1790,7 +1791,16 @@ function renderTabs(){
     btn.innerHTML = `<span class="dot"></span><span class="tab-label">${siteLabel(key)}</span><span class="tab-edit" title="${t("renameAreaTooltip")}">✎</span>`;
     btn.onclick = (ev)=>{
       if(ev.target.closest(".tab-edit")){ ev.stopPropagation(); requireUnlock(()=>openRenameAreaModal(key)); return; }
-      state.site = key; renderAll();
+      state.site = key;
+      // If the currently selected date has no data for this area (e.g. its
+      // real reporting month differs from whichever area/date was last
+      // viewed), jump to this area's own last reported date instead of
+      // silently showing blank/zero KPIs for the wrong month.
+      if(!siteHasDataOnDate(key, state.iso)){
+        const d = lastEntryDate(key);
+        if(d) state.iso = d;
+      }
+      renderAll();
     };
     nav.appendChild(btn);
   });
@@ -2871,8 +2881,16 @@ function parseHaulingAreaSheet(ws, fallbackYear){
   for(let r=headerRow+2;r<=maxRow;r++){
     const label = cellValHauling(ws,"C"+r);
     if(!label) continue;
-    const canonical = CANONICAL_FIELDS.find(f => f.re.test(String(label)));
+    const labelStr = String(label);
+    const canonical = CANONICAL_FIELDS.find(f => f.re.test(labelStr));
     if(!canonical) continue;
+    // "Cycles Achieved Client X" / "Tons Hauled Client X" style rows are
+    // client-target figures, not the actual metric — never let them match.
+    if(/client/i.test(labelStr) && (canonical.label==="Tons Hauled (Area)" || canonical.label==="Cycles Achieved (Area)")) continue;
+    // First matching row wins — a later row that happens to match the same
+    // canonical field (e.g. a client-target duplicate) must never silently
+    // overwrite the real one already captured.
+    if(fields[canonical.label]) continue;
     if(canonical.label==="Tons Hauled (Area)") hasTons = true;
     if(canonical.label==="Cycles Achieved (Area)") hasCycles = true;
     const perDate = {};
