@@ -2834,6 +2834,9 @@ function colLetter(n){
 function cellValHauling(ws, addr){
   const cell = ws[addr];
   if(!cell || cell.v===undefined) return null;
+  // Excel error cells (#DIV/0!, #N/A, #VALUE!, #REF!, etc.) must never be
+  // treated as 0 — they mean "not yet calculated / no data", not "zero".
+  if(cell.t === "e") return null;
   return cell.v;
 }
 function sheetDims(ws){
@@ -2938,6 +2941,14 @@ function handleExcelFile(file){
 function confirmUploadImport(){
   if(!PENDING_IMPORT || !EDIT_UNLOCKED) return;
   let touchedDates = new Set();
+  // Only these two fields represent real, reported production (every hauling
+  // sheet must have them to even be recognised as an area — see hasTons/hasCycles
+  // in parseHaulingAreaSheet). Secondary fields like "Driver DT Standby Ready"
+  // are sometimes zero-filled further into the month as a placeholder even on
+  // days nothing was actually hauled, which used to drag the "jump to latest
+  // date" below past the area's real last reporting day.
+  const CORE_DATE_FIELDS = new Set(["Tons Hauled (Area)", "Cycles Achieved (Area)"]);
+  let coreTouchedDates = new Set();
   Object.keys(PENDING_IMPORT.areas).forEach(siteKey=>{
     if(!DATA.sites[siteKey]){
       const tpl = defaultAreaTemplate();
@@ -2958,11 +2969,12 @@ function confirmUploadImport(){
         if(v.day!==null) row.entries[iso].day = v.day;
         if(v.night!==null) row.entries[iso].night = v.night;
         touchedDates.add(iso);
+        if(CORE_DATE_FIELDS.has(canonicalLabel)) coreTouchedDates.add(iso);
       });
     });
   });
   rebuildSiteOrder();
-  const lastIso = Array.from(touchedDates).sort().pop();
+  const lastIso = Array.from(coreTouchedDates.size ? coreTouchedDates : touchedDates).sort().pop();
   if(lastIso) state.iso = lastIso;
   persist("Update data hauling dari upload Excel ("+Object.keys(PENDING_IMPORT.areas).length+" area)");
   document.getElementById("uploadPreviewModal").classList.remove("open");
