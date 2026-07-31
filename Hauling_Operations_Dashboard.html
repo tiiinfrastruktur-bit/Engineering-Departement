@@ -701,6 +701,11 @@ table.generic-table tr:hover td{ background:rgba(232,169,13,0.06); }
       <button data-mode="daily" class="active" data-i18n="modeDaily">Daily</button>
       <button data-mode="mtd" data-i18n="modeMTD">Month to Date</button>
     </div>
+    <div class="mode-toggle shift-toggle">
+      <button data-shift="combined" class="active" data-i18n="shiftCombined">Combined</button>
+      <button data-shift="day" data-i18n="shiftDay">Day Shift</button>
+      <button data-shift="night" data-i18n="shiftNight">Night Shift</button>
+    </div>
     <div class="date-picker">
       <label data-i18n="dateLabel">Date</label>
       <button id="prevDate">‹</button>
@@ -1083,6 +1088,9 @@ const STRINGS = {
     statusOriginal: "data awal (file asli)",
     modeDaily: "Harian",
     modeMTD: "Month to Date",
+    shiftCombined: "Gabungan",
+    shiftDay: "Shift Day",
+    shiftNight: "Shift Night",
     dateLabel: "Tanggal",
     btnReset: "⟲ Reset",
     btnPriceSettings: "💲 Harga & Kurs",
@@ -1242,6 +1250,9 @@ const STRINGS = {
     statusOriginal: "original data (source file)",
     modeDaily: "Daily",
     modeMTD: "Month to Date",
+    shiftCombined: "Combined",
+    shiftDay: "Day Shift",
+    shiftNight: "Night Shift",
     dateLabel: "Date",
     btnReset: "⟲ Reset",
     btnPriceSettings: "💲 Price & Rate",
@@ -1554,35 +1565,41 @@ function valAt(row, iso){
   const e = row.entries[iso];
   return { day: e.day===undefined?null:e.day, night: e.night===undefined?null:e.night };
 }
-function sumDN(row, iso){
+function sumDN(row, iso, shift){
   const v = valAt(row, iso);
+  if(shift==="day") return v.day;
+  if(shift==="night") return v.night;
   if(v.day===null && v.night===null) return null;
   return (v.day||0)+(v.night||0);
 }
-function avgDN(row, iso){
+function avgDN(row, iso, shift){
   const v = valAt(row, iso);
+  if(shift==="day") return v.day;
+  if(shift==="night") return v.night;
   const vals = [v.day,v.night].filter(x=>x!==null && x!==undefined);
   return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
 }
-function sumRangeISO(row, startIso, endIso){
+function sumRangeISO(row, startIso, endIso, shift){
   if(!row) return null;
   let s=0, any=false;
   for(const iso in row.entries){
     if(iso<startIso || iso>endIso) continue;
     const e = row.entries[iso];
-    if(e.day!==null && e.day!==undefined){ s+=e.day; any=true; }
-    if(e.night!==null && e.night!==undefined){ s+=e.night; any=true; }
+    const useDay = shift!=="night", useNight = shift!=="day";
+    if(useDay && e.day!==null && e.day!==undefined){ s+=e.day; any=true; }
+    if(useNight && e.night!==null && e.night!==undefined){ s+=e.night; any=true; }
   }
   return any? s : null;
 }
-function avgRangeISO(row, startIso, endIso){
+function avgRangeISO(row, startIso, endIso, shift){
   if(!row) return null;
   let s=0, c=0;
   for(const iso in row.entries){
     if(iso<startIso || iso>endIso) continue;
     const e = row.entries[iso];
-    if(e.day!==null && e.day!==undefined){ s+=e.day; c++; }
-    if(e.night!==null && e.night!==undefined){ s+=e.night; c++; }
+    const useDay = shift!=="night", useNight = shift!=="day";
+    if(useDay && e.day!==null && e.day!==undefined){ s+=e.day; c++; }
+    if(useNight && e.night!==null && e.night!==undefined){ s+=e.night; c++; }
   }
   return c? s/c : null;
 }
@@ -1590,14 +1607,14 @@ function avgRangeISO(row, startIso, endIso){
    rather than dividing period totals — avoids inflating trip/unit for MTD
    (summed cycles over N days ÷ a single average headcount would overstate
    it roughly N-fold). For a single-day range this reduces to that day's ratio. */
-function avgRatioRangeISO(numRow, denomRow, startIso, endIso){
+function avgRatioRangeISO(numRow, denomRow, startIso, endIso, shift){
   if(!numRow || !denomRow) return null;
   const isos = new Set();
   Object.keys(numRow.entries).forEach(iso=>{ if(iso>=startIso && iso<=endIso) isos.add(iso); });
   let sum=0, count=0;
   isos.forEach(iso=>{
-    const n = sumDN(numRow, iso);
-    const d = sumDN(denomRow, iso);
+    const n = sumDN(numRow, iso, shift);
+    const d = sumDN(denomRow, iso, shift);
     if(n!==null && d){ sum += n/d; count++; }
   });
   return count? sum/count : null;
@@ -1661,11 +1678,12 @@ function globalLastEntryDate(){
 /* ============================================================
    Per-site KPI computation (shared by single-site view & combine)
    ============================================================ */
-function siteKPIs(site, iso, mode){
+function siteKPIs(site, iso, mode, shift){
+  shift = shift || (typeof state!=="undefined" ? state.shift : "combined") || "combined";
   const startIso = mode==="mtd" ? firstOfMonthISO(iso) : iso;
   const endIso = iso;
-  const rangeSum = row => mode==="mtd" ? sumRangeISO(row,startIso,endIso) : sumDN(row,iso);
-  const rangeAvg = row => mode==="mtd" ? avgRangeISO(row,startIso,endIso) : avgDN(row,iso);
+  const rangeSum = row => mode==="mtd" ? sumRangeISO(row,startIso,endIso,shift) : sumDN(row,iso,shift);
+  const rangeAvg = row => mode==="mtd" ? avgRangeISO(row,startIso,endIso,shift) : avgDN(row,iso,shift);
 
   const tonsRow = findRow(site,[/^Tons Hauled/i]);
   const cyclesRow = findRow(site,[/^Cycles Achieved \(/i]);
@@ -1693,19 +1711,19 @@ function siteKPIs(site, iso, mode){
   const cycleTime = rangeAvg(cycleTimeRow);
   let tonnageAvg = rangeAvg(tonnageAvgRow);
   if(tonnageAvg===null && tons!==null && cycles){ tonnageAvg = tons/cycles; }
-  const driver = mode==="mtd" ? avgRangeISO(driverRow,startIso,endIso) : sumDN(driverRow,iso);
-  const rfu = mode==="mtd" ? avgRangeISO(rfuRow,startIso,endIso) : avgDN(rfuRow,iso);
+  const driver = mode==="mtd" ? avgRangeISO(driverRow,startIso,endIso,shift) : sumDN(driverRow,iso,shift);
+  const rfu = mode==="mtd" ? avgRangeISO(rfuRow,startIso,endIso,shift) : avgDN(rfuRow,iso,shift);
   const breakdown = rangeSum(breakdownRow);
   const delayC = rangeSum(delayCRow);
   const delayU = rangeSum(delayURow);
   const tyres = (rangeSum(tyresNRow)||0) + (rangeSum(tyresSRow)||0);
-  const standby = mode==="mtd" ? avgRangeISO(standbyRow,startIso,endIso) : sumDN(standbyRow,iso);
+  const standby = mode==="mtd" ? avgRangeISO(standbyRow,startIso,endIso,shift) : sumDN(standbyRow,iso,shift);
   const delayHrs = rangeSum(delayHrsRow);
   const planProd = rangeSum(planRow);
   const planInternal = rangeSum(planInternalRow);
   const lostProd = rangeSum(lostProdRow);
   const unitsForTripRow = driverRow || rfuRow;
-  const tripUnit = avgRatioRangeISO(cyclesRow, unitsForTripRow, startIso, endIso);
+  const tripUnit = avgRatioRangeISO(cyclesRow, unitsForTripRow, startIso, endIso, shift);
   const priceUsdPerTon = (DATA.sites[site] && DATA.sites[site].priceUsdPerTon) || 0;
   const exchangeRate = DATA.exchangeRate || 0;
   const revenueUsd = (tons!==null && priceUsdPerTon>0) ? tons*priceUsdPerTon : null;
@@ -1721,10 +1739,11 @@ function siteKPIs(site, iso, mode){
   };
 }
 
-function combinedKPIs(iso, mode){
+function combinedKPIs(iso, mode, shift){
+  shift = shift || (typeof state!=="undefined" ? state.shift : "combined") || "combined";
   const startIso = mode==="mtd" ? firstOfMonthISO(iso) : iso;
   const activeSites = SITE_ORDER.filter(k => mode==="mtd" ? siteHasDataInRange(k,startIso,iso) : siteHasDataOnDate(k,iso));
-  const per = activeSites.map(k=>({ site:k, label:siteLabel(k), ...siteKPIs(k, iso, mode) }));
+  const per = activeSites.map(k=>({ site:k, label:siteLabel(k), ...siteKPIs(k, iso, mode, shift) }));
   const sumField = f=>{ const vals = per.map(p=>p[f]).filter(v=>v!==null&&v!==undefined); return vals.length? vals.reduce((a,b)=>a+b,0) : null; };
   const avgField = f=>{ const vals = per.map(p=>p[f]).filter(v=>v!==null&&v!==undefined); return vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null; };
   const tons = sumField("tons"), cycles = sumField("cycles"), driver = sumField("driver");
@@ -1748,7 +1767,8 @@ function combinedKPIs(iso, mode){
 
 /* Daily tonnage per area from the 1st of the month through the selected
    date — feeds the MTD "daily trend" line chart in the combined view. */
-function combinedDailyTonnageSeries(endIso){
+function combinedDailyTonnageSeries(endIso, shift){
+  shift = shift || (typeof state!=="undefined" ? state.shift : "combined") || "combined";
   const startIso = firstOfMonthISO(endIso);
   const dates = [];
   let cur = startIso;
@@ -1756,7 +1776,7 @@ function combinedDailyTonnageSeries(endIso){
   const activeSites = SITE_ORDER.filter(k => siteHasDataInRange(k, startIso, endIso));
   const series = activeSites.map(key=>{
     const tonsRow = findRow(key,[/^Tons Hauled/i]);
-    return { key, label: siteLabel(key), data: dates.map(iso => tonsRow ? sumDN(tonsRow, iso) : null) };
+    return { key, label: siteLabel(key), data: dates.map(iso => tonsRow ? sumDN(tonsRow, iso, shift) : null) };
   });
   const total = dates.map((iso, idx)=>{
     let sum = 0, any = false;
@@ -1769,7 +1789,7 @@ function combinedDailyTonnageSeries(endIso){
 /* ============================================================
    App state
    ============================================================ */
-const state = { site: COMBINED_KEY, mode:"daily", iso: todayISO() };
+const state = { site: COMBINED_KEY, mode:"daily", iso: todayISO(), shift:"combined" };
 let charts = {};
 
 /* ============================================================
@@ -1816,8 +1836,11 @@ function renderTabs(){
    RENDER: controls (mode, date input, month note)
    ============================================================ */
 function renderControls(){
-  document.querySelectorAll(".mode-toggle button").forEach(b=>{
+  document.querySelectorAll(".mode-toggle button[data-mode]").forEach(b=>{
     b.classList.toggle("active", b.dataset.mode===state.mode);
+  });
+  document.querySelectorAll(".shift-toggle button[data-shift]").forEach(b=>{
+    b.classList.toggle("active", b.dataset.shift===state.shift);
   });
   const input = document.getElementById("dateInput");
   input.value = state.iso;
@@ -2034,7 +2057,7 @@ function renderCharts(){
   // build list of ISO dates present for this site between first..last (only dates with any entry)
   const allIso = allEntryDates(site);
   const dates = allIso.map(shortDate);
-  const rowVal = (row, agg) => allIso.map(iso => agg==="sum"?sumDN(row,iso):avgDN(row,iso));
+  const rowVal = (row, agg) => allIso.map(iso => agg==="sum"?sumDN(row,iso,state.shift):avgDN(row,iso,state.shift));
 
   const tonsRow = findRow(site,[/^Tons Hauled/i]);
   if(tonsRow){
@@ -2060,8 +2083,8 @@ function renderCharts(){
   const driverRow = findRow(site,[/Driver DT Running Total/i]);
   const cyclesRowForGauge = findRow(site,[/^Cycles Achieved \(/i]);
   const tripVal = (()=>{
-    const c = sumDN(cyclesRowForGauge, state.iso);
-    const u = sumDN(driverRow, state.iso);
+    const c = sumDN(cyclesRowForGauge, state.iso, state.shift);
+    const u = sumDN(driverRow, state.iso, state.shift);
     return (c!==null && u) ? c/u : null;
   })();
   if(tripVal!==null){
@@ -3100,7 +3123,8 @@ async function init(){
   document.getElementById("unlockInput").addEventListener("keydown", e=>{ if(e.key==="Enter") confirmUnlock(); });
 
   document.querySelectorAll(".lang-toggle button").forEach(b=>{ b.onclick = ()=>setLang(b.dataset.lang); });
-  document.querySelectorAll(".mode-toggle button").forEach(b=>{ b.onclick = ()=>{ state.mode=b.dataset.mode; renderAll(); }; });
+  document.querySelectorAll(".mode-toggle button[data-mode]").forEach(b=>{ b.onclick = ()=>{ state.mode=b.dataset.mode; renderAll(); }; });
+  document.querySelectorAll(".shift-toggle button[data-shift]").forEach(b=>{ b.onclick = ()=>{ state.shift=b.dataset.shift; renderAll(); }; });
 
   document.getElementById("dateInput").onchange = e=>{ if(e.target.value){ state.iso = e.target.value; renderAll(); } };
   document.getElementById("prevDate").onclick = ()=>{ state.iso = addDaysISO(state.iso,-1); renderAll(); };
