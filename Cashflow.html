@@ -719,6 +719,11 @@ table.generic-table tr:hover td{ background:rgba(232,169,13,0.06); }
 
     <div id="detailContent" style="display:none;">
       <section class="panel table-panel" style="margin-top:16px; margin-bottom:20px;">
+        <div class="table-head"><h3 style="margin:0;" data-i18n="planActualTitle">Plan vs Actual (dari Actual Invoice Hauling &amp; Rental)</h3></div>
+        <div class="table-scroll open" id="planActualTableWrap"></div>
+      </section>
+
+      <section class="panel table-panel" style="margin-bottom:20px;">
         <div class="table-head"><h3 style="margin:0;" data-i18n="byBusinessTitle">Profitabilitas per Unit Bisnis</h3></div>
         <div class="table-scroll open" id="businessTableWrap"></div>
       </section>
@@ -935,6 +940,12 @@ const STR = {
     confirmDelete: "Hapus transaksi ini?", amountRequired: "Jumlah wajib diisi.", categoryRequired: "Kategori wajib diisi.",
     periodLabel: "Periode:", asOfLabel: "Data per:",
     byBusinessTitle: "Profitabilitas per Unit Bisnis", byLocationTitle: "Pengeluaran per Lokasi",
+    planActualTitle: "Plan vs Actual (dari Actual Invoice Hauling &amp; Rental)",
+    colCategoryPA: "Kategori", colActual: "Actual", colPlan: "Plan", colDifference: "Selisih", colAchievement: "Pencapaian", colIndicator: "Indikator",
+    paSectionIncome: "PENDAPATAN", paSectionExpense: "PENGELUARAN", paSectionNet: "SELISIH BERSIH (DEVIATION)",
+    paNoPlan: "Tidak ada plan terpisah (sudah termasuk dalam plan Hauling)",
+    paLabelTotalInvoice: "Total Invoice", paLabelHaulingActivity: "Hauling Activity", paLabelRentalEquipment: "Rental Equipment",
+    paLabelTotalExpenses: "Total Expenses", paLabelHeadOffice: "Head Office", paLabelDeviation: "Deviation",
     signalsTitle: "Sinyal Manajemen Harian", topSiteTitle: "Top 5 Biaya Site/Proyek", topHOTitle: "Top 5 Biaya Head Office",
     colBusiness: "Unit Bisnis", colInvoice: "Invoice (Rp)", colDirectExpenses: "Biaya Langsung (Rp)",
     colContribution: "Kontribusi (Rp)", colMargin: "Margin", colLocation2: "Lokasi", colAmount2: "Jumlah (Rp)",
@@ -943,6 +954,7 @@ const STR = {
     uploadNoSheet: "Sheet \"Actual Dashboard\" tidak ditemukan di file ini.",
     uploadFoundRows: "Ditemukan ringkasan cashflow periode {period}. Data lama akan digantikan setelah dikonfirmasi.",
     uploadFoundTransactions: "Ditemukan {n} transaksi (dari Petty Cash &amp; Sparepart Detail). Transaksi hasil upload sebelumnya akan digantikan; transaksi yang Anda input manual tetap aman.",
+    uploadFoundPlanActual: "Ditemukan {n} baris Plan vs Actual (dari Actual Invoice Hauling & Rental).",
     uploadError: "Gagal membaca file Excel. Pastikan formatnya .xlsx yang valid.",
     uploadSuccess: "Data cashflow berhasil diperbarui dari file Excel.",
     autoRevenueTitle: "🔗 Revenue Real-time Bulan Berjalan (Hauling + Rental)",
@@ -985,6 +997,12 @@ const STR = {
     confirmDelete: "Delete this transaction?", amountRequired: "Amount is required.", categoryRequired: "Category is required.",
     periodLabel: "Period:", asOfLabel: "Data as of:",
     byBusinessTitle: "Profitability by Business Unit", byLocationTitle: "Expenses by Location",
+    planActualTitle: "Plan vs Actual (from Actual Invoice Hauling &amp; Rental)",
+    colCategoryPA: "Category", colActual: "Actual", colPlan: "Plan", colDifference: "Difference", colAchievement: "Achievement", colIndicator: "Indicator",
+    paSectionIncome: "INCOME", paSectionExpense: "EXPENSES", paSectionNet: "NET DIFFERENCE (DEVIATION)",
+    paNoPlan: "No separate plan (already included in Hauling's plan)",
+    paLabelTotalInvoice: "Total Invoice", paLabelHaulingActivity: "Hauling Activity", paLabelRentalEquipment: "Rental Equipment",
+    paLabelTotalExpenses: "Total Expenses", paLabelHeadOffice: "Head Office", paLabelDeviation: "Deviation",
     signalsTitle: "Daily Management Signals", topSiteTitle: "Top 5 Site/Project Expenses", topHOTitle: "Top 5 Head Office Expenses",
     colBusiness: "Business Unit", colInvoice: "Invoice (Rp)", colDirectExpenses: "Direct Expenses (Rp)",
     colContribution: "Contribution (Rp)", colMargin: "Margin", colLocation2: "Location", colAmount2: "Amount (Rp)",
@@ -993,6 +1011,7 @@ const STR = {
     uploadNoSheet: "Sheet \"Actual Dashboard\" was not found in this file.",
     uploadFoundRows: "Cashflow summary found for period {period}. The old data will be replaced once confirmed.",
     uploadFoundTransactions: "Found {n} transactions (from Petty Cash &amp; Sparepart Detail). Previously-imported transactions will be replaced; your manually-entered transactions stay untouched.",
+    uploadFoundPlanActual: "Found {n} Plan vs Actual rows (from Actual Invoice Hauling & Rental).",
     uploadError: "Failed to read the Excel file. Make sure it's a valid .xlsx file.",
     uploadSuccess: "Cashflow data updated successfully from Excel.",
     autoRevenueTitle: "🔗 Real-time Revenue This Month (Hauling + Rental)",
@@ -1303,6 +1322,37 @@ function renderAutoRevenue(){
     <div class="kpi-card accent-green"><div class="kpi-label">${t("kpiAutoTotal")}</div><div class="kpi-value" style="font-size:22px;">${fmtRp(total)}</div></div>
   `;
 }
+function renderPlanActualTable(){
+  const wrap = document.getElementById("planActualTableWrap");
+  const rows = SNAPSHOT.planActual || [];
+  if(!rows.length){ wrap.innerHTML = `<div class="empty-note" style="padding:16px; font-size:12px;">–</div>`; return; }
+  const labelKeyMap = {
+    "Total Invoice":"paLabelTotalInvoice", "Hauling Activity":"paLabelHaulingActivity", "Rental Equipment":"paLabelRentalEquipment",
+    "Total Expenses":"paLabelTotalExpenses", "Head Office":"paLabelHeadOffice", "Deviation":"paLabelDeviation",
+  };
+  let head = `<tr><th class="rowlabel">${t("colCategoryPA")}</th><th>${t("colActual")}</th><th>${t("colPlan")}</th><th>${t("colDifference")}</th><th>${t("colAchievement")}</th><th class="rowlabel">${t("colIndicator")}</th></tr>`;
+  const groups = [["income",t("paSectionIncome")], ["expense",t("paSectionExpense")], ["net",t("paSectionNet")]];
+  let body = "";
+  groups.forEach(([kind,sectionLabel])=>{
+    const groupRows = rows.filter(r=>r.kind===kind);
+    if(!groupRows.length) return;
+    body += `<tr><td colspan="6" style="background:var(--bg-2); font-size:10.5px; font-weight:700; letter-spacing:0.05em; color:var(--text-faint); padding:6px 10px;">${sectionLabel}</td></tr>`;
+    groupRows.forEach(r=>{
+      const isBold = r.label==="Total Invoice" || r.label==="Total Expenses" || r.label==="Deviation";
+      const diffGood = kind==="expense" ? (r.difference<=0) : (r.difference>=0);
+      const pctCell = (r.plan===0 || r.plan===null) ? `<span style="color:var(--text-faint); font-size:11px;">${t("paNoPlan")}</span>` : `${fmtNum(r.achievementPct,1)}%`;
+      body += `<tr style="${isBold?'font-weight:700;':''}">
+        <td class="rowlabel">${escapeHtml(t(labelKeyMap[r.label]||r.label))}</td>
+        <td>${fmtRp(r.actual)}</td>
+        <td>${r.plan===0?fmtRp(0):fmtRp(r.plan)}</td>
+        <td class="${diffGood?'better':'worse'}">${r.difference>0?"+":""}${fmtRp(r.difference)}</td>
+        <td>${pctCell}</td>
+        <td class="rowlabel" style="font-size:11px; color:var(--text-dim);">${escapeHtml(r.indicator||"")}</td>
+      </tr>`;
+    });
+  });
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="data-table" style="min-width:640px;"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
 function renderBusinessTable(){
   const wrap = document.getElementById("businessTableWrap");
   const rows = SNAPSHOT.byBusiness || [];
@@ -1441,6 +1491,7 @@ function renderAll(){
   renderSummaryKPI();
   renderAutoRevenue();
   renderDetailVisibility();
+  renderPlanActualTable();
   renderBusinessTable();
   renderLocationTable();
   renderSignalsTable();
@@ -1611,8 +1662,37 @@ function parseCashflowWorkbook(workbook){
     }
   }
 
+  // Plan vs Actual vs Difference summary, from the "Actual Invoice Hauling &
+  // Rental" sheet. Scanned by matching row labels (rather than fixed row
+  // numbers) so a row shifting up/down by a line or two between monthly
+  // exports doesn't break the import.
+  const planActual = [];
+  const invoiceName = workbook.SheetNames.find(n => n.toLowerCase().includes("actual invoice hauling"));
+  if(invoiceName){
+    const iaWs = workbook.Sheets[invoiceName];
+    const maxRow = sheetMaxRow(iaWs);
+    const wantedLabels = ["Total Invoice","Hauling Activity","Rental Equipment","Total Expenses","Head Office","Deviation"];
+    let inExpenseSection = false;
+    for(let r=1;r<=maxRow;r++){
+      const label = cellVal(iaWs,"B"+r);
+      if(!label) continue;
+      const labelStr = String(label).trim();
+      if(!wantedLabels.includes(labelStr)) continue;
+      const actual = num(cellVal(iaWs,"C"+r));
+      const plan = num(cellVal(iaWs,"D"+r));
+      const diff = num(cellVal(iaWs,"E"+r));
+      const indicator = cellVal(iaWs,"F"+r);
+      if(actual===null && plan===null) continue;
+      let kind = "income";
+      if(labelStr==="Total Expenses"){ inExpenseSection = true; kind = "expense"; }
+      else if(labelStr==="Deviation") kind = "net";
+      else if(inExpenseSection) kind = "expense";
+      planActual.push({ label: labelStr, kind, actual, plan, difference: diff, indicator, achievementPct: (plan && plan!==0) ? (actual/plan*100) : null });
+    }
+  }
+
   if(!summary.totalInvoice && !byBusiness.length) return { error: "uploadNoSheet" };
-  return { summary, byBusiness, byLocation, topSite, topHO, signals, entries };
+  return { summary, byBusiness, byLocation, topSite, topHO, signals, entries, planActual };
 }
 function openUploadPreview(result){
   const body = document.getElementById("uploadPreviewBody");
@@ -1622,9 +1702,11 @@ function openUploadPreview(result){
   } else {
     document.getElementById("confirmUploadBtn").style.display = "";
     const n = (result.entries||[]).length;
+    const pa = (result.planActual||[]).length;
     body.innerHTML = `<p>${t("uploadFoundRows").replace("{period}", escapeHtml(result.summary.period||"–"))}</p>
       <p style="margin-top:10px;">${t("kpiTotalRevenue")}: ${fmtRp(result.summary.totalInvoice)}<br>${t("kpiTotalExpense")}: ${fmtRp(result.summary.totalExpenses)}<br>${t("kpiNetCashflow")}: ${fmtRp(result.summary.operatingProfit)}</p>
-      <p style="margin-top:10px;">${t("uploadFoundTransactions").replace("{n}", n)}</p>`;
+      <p style="margin-top:10px;">${t("uploadFoundTransactions").replace("{n}", n)}</p>
+      <p style="margin-top:6px; font-size:12px; color:var(--text-faint);">${t("uploadFoundPlanActual").replace("{n}", pa)}</p>`;
   }
   PENDING_IMPORT = result.error ? null : result;
   document.getElementById("uploadPreviewModal").classList.add("open");
